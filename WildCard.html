@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Wild Card Lines</title>
+  <link rel="preconnect" href="https://unpkg.com">
+  <style>
+    :root{
+      --bg:#0b0d12; --card:#141826; --muted:#8ea0b5;
+      --pill:#1e2538; --pill-hover:#28304a; --pill-active:#3553ff22;
+      --accent:#8ab4ff; --good:#35c26b; --bad:#ff5d5d;
+      --border:#2b3550;
+    }
+    html,body{margin:0;background:var(--bg);color:#e8f0ff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
+    .wrap{max-width:1100px;margin:auto;padding:22px;}
+    h1{font-weight:700;letter-spacing:.2px;margin:0 0 14px;}
+    .hint{color:var(--muted);font-size:.9rem;margin:0 0 18px;}
+    .game{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:14px 14px 12px;margin:12px 0;}
+    .head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:0 4px 10px;margin-bottom:12px}
+    .when{color:var(--muted);font-size:.92rem;white-space:nowrap}
+    .teams{font-weight:700}
+    .grid{display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) 110px 140px;gap:8px;align-items:stretch}
+    @media (max-width:920px){ .grid{grid-template-columns:repeat(2,minmax(0,1fr));}
+      .labels{display:none}
+    }
+    .pill{
+      border:1px solid var(--border); background:var(--pill); border-radius:10px;
+      padding:10px 10px; cursor:pointer; line-height:1.1; display:flex; justify-content:space-between; gap:8px;
+      transition:background .15s,border-color .15s, box-shadow .15s;
+      user-select:none;
+    }
+    .pill:hover{background:var(--pill-hover)}
+    .pill.active{box-shadow:0 0 0 2px var(--accent) inset;background:var(--pill-active)}
+    .pill .name{font-weight:600}
+    .pill .odds{color:var(--muted)}
+    .collabel{color:var(--muted);font-size:.82rem;margin:-2px 0 2px 2px}
+    .money input{
+      width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
+      background:#0f1422;color:#e8f0ff;font-size:16px;padding:10px 12px;outline:none;
+    }
+    .payout{
+      background:#0f1422;border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;
+      font-weight:700;
+    }
+    .tag{font-size:.78rem;color:var(--muted);padding:2px 8px;border:1px solid var(--border);border-radius:999px}
+    .empty{color:var(--muted)}
+    footer{color:var(--muted);font-size:.85rem;margin-top:18px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Wild Card Lines</h1>
+    <p class="hint">Click a bet, enter a <strong>Wager</strong>, and we’ll compute <strong>To Win</strong>. Data is pulled from your Google Sheet.</p>
+
+    <div id="games" class="list"></div>
+
+    <footer>Odds payout: if odds are negative, payout = wager + (wager / |odds|) * 100; if positive, payout = wager + (wager / 100) * odds.</footer>
+  </div>
+
+  <!-- PapaParse for robust CSV parsing -->
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+  <script>
+    // 1) Replace this with your published CSV URL:
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+    // 2) Column keys expected in your sheet (must match headers in row 1)
+    const COLS = {
+      date: "Date",
+      time: "Time",
+      channel: "Channel",
+      away: "Away",
+      aSu: "A SU Line",
+      aSpread: "A Spread",
+      aSpreadLine: "A Spread Line",
+      home: "Home",
+      hSu: "H SU Line",
+      hSpread: "H Spread",
+      hSpreadLine: "H Spread Line",
+      ouTotal: "Over/Under",
+      oLine: "O Line",
+      uLine: "U Line"
+    };
+
+    // Utility to render + sign for positive numbers
+    const fmtSigned = (n) => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
+
+    // Payout calculation (returns total return, not just profit)
+    function computePayout(wager, odds){
+      const w = Number(wager||0), o = Number(odds);
+      if (!w || !o) return 0;
+      if (o < 0) return w + (w / Math.abs(o)) * 100;  // uses |odds|
+      return w + (w / 100) * o;
+    }
+
+    // Build a single "pill" item
+    function pill(label, odds, gameId, key){
+      const btn = document.createElement("button");
+      btn.className = "pill";
+      btn.type = "button";
+      btn.dataset.gameId = gameId;
+      btn.dataset.key = key;
+      btn.dataset.odds = odds ?? "";
+      btn.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
+      btn.addEventListener("click", () => selectPill(btn));
+      return btn;
+    }
+
+    // Handle selection toggle (one active per game)
+    function selectPill(btn){
+      const game = document.querySelector(`.game[data-id="${btn.dataset.gameId}"]`);
+      game.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+      btn.classList.add("active");
+      updatePayout(game);
+    }
+
+    function updatePayout(game){
+      const wager = game.querySelector("input.wager").value;
+      const active = game.querySelector(".pill.active");
+      const payoutEl = game.querySelector(".payout");
+      if(!active || !wager){ payoutEl.textContent = "—"; return; }
+      const odds = Number(active.dataset.odds);
+      const total = computePayout(wager, odds);
+      payoutEl.textContent = isFinite(total) ? `$${total.toFixed(2)}` : "—";
+    }
+
+    function buildGameRow(row, idx){
+      const game = document.createElement("section");
+      game.className = "game";
+      game.dataset.id = idx;
+
+      // Header row
+      const head = document.createElement("div");
+      head.className = "head";
+      const when = document.createElement("div");
+      when.className = "when";
+      when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
+      const teams = document.createElement("div");
+      teams.className = "teams";
+      teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+      head.append(teams, when);
+      game.appendChild(head);
+
+      // Grid columns
+      const grid = document.createElement("div");
+      grid.className = "grid";
+
+      // 6 clickable pills
+      grid.append(
+        pill(`${row[COLS.away]}`, row[COLS.aSu], idx, "awayMl"),
+        pill(`${row[COLS.home]}`, row[COLS.hSu], idx, "homeMl"),
+        pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "awaySpread"),
+        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "homeSpread"),
+        pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "over"),
+        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "under"),
+      );
+
+      // Wager input
+      const wagerWrap = document.createElement("div");
+      wagerWrap.className = "money";
+      const wagerLabel = document.createElement("div");
+      wagerLabel.className = "collabel";
+      wagerLabel.textContent = "Wager";
+      const wagerInput = document.createElement("input");
+      wagerInput.type = "number";
+      wagerInput.min = "0";
+      wagerInput.step = "1";
+      wagerInput.placeholder = "0";
+      wagerInput.className = "wager";
+      wagerInput.addEventListener("input", () => updatePayout(game));
+      wagerWrap.append(wagerLabel, wagerInput);
+
+      // To Win display
+      const winWrap = document.createElement("div");
+      const winLabel = document.createElement("div");
+      winLabel.className = "collabel";
+      winLabel.textContent = "To Win";
+      const payout = document.createElement("div");
+      payout.className = "payout";
+      payout.textContent = "—";
+      winWrap.append(winLabel, payout);
+
+      grid.append(wagerWrap, winWrap);
+      game.appendChild(grid);
+      return game;
+    }
+
+    function render(rows){
+      const container = document.getElementById("games");
+      container.innerHTML = "";
+      rows.forEach((r, i) => {
+        // skip blank lines
+        if(!(r[COLS.away] && r[COLS.home])) return;
+        container.appendChild(buildGameRow(r, i));
+      });
+    }
+
+    // Load CSV and render
+    function load(){
+      if(!SHEET_CSV_URL || SHEET_CSV_URL.startsWith("PASTE_")){
+        // Show a friendly placeholder if URL not provided yet
+        const demo = [
+          { "Date":"Saturday","Time":"4:30 PM","Channel":"CBS","Away":"Chargers","A SU Line":"-154","A Spread":"-2.5","A Spread Line":"-118","Home":"Texans","H SU Line":"130","H Spread":"2.5","H Spread Line":"-104","Over/Under":"42.5","O Line":"-110","U Line":"-110" }
+        ];
+        render(demo);
+        return;
+      }
+      Papa.parse(SHEET_CSV_URL, {
+        download:true, header:true, dynamicTyping:true, skipEmptyLines:true,
+        complete: (res) => render(res.data)
+      });
+    }
+    load();
+  </script>
+</body>
+</html>
