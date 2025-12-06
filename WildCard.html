@@ -15,8 +15,6 @@
     --border:#1e2a45;
     --text:#eef3ff;
   }
-
-  /* ===== Base ===== */
   html,body{margin:0;background:var(--navy);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
   .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
 
@@ -39,10 +37,7 @@
   .totals{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
   .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
   .chip strong{color:var(--orange)}
-  @media (max-width:860px){
-    .topbar .inner{grid-template-columns:1fr}
-    .field{max-width:100%}
-  }
+  @media (max-width:860px){ .topbar .inner{grid-template-columns:1fr} .field{max-width:100%} }
 
   /* ===== Games ===== */
   h1{margin:14px 0 8px}
@@ -52,12 +47,8 @@
   .when{color:var(--muted);font-size:.92rem}
   .teams{font-weight:700}
   .rowlabel{grid-column:1 / -1;color:var(--muted);font-size:.84rem;margin-top:6px}
-
-  .row{
-    display:grid;grid-template-columns:1fr 1fr 120px 140px;gap:8px;align-items:stretch;margin:8px 0
-  }
-  @media (max-width:780px){ .row{grid-template-columns:1fr}}
-
+  .row{display:grid;grid-template-columns:1fr 1fr 120px 140px;gap:8px;align-items:stretch;margin:8px 0}
+  @media (max-width:780px){ .row{grid-template-columns:1fr} }
   .pill{
     border:1px solid var(--border);background:var(--navy-2);border-radius:10px;
     padding:10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;
@@ -67,7 +58,6 @@
   .pill.active{box-shadow:0 0 0 2px var(--orange) inset;background:#1c2946}
   .pill .name{font-weight:700}
   .pill .odds{color:var(--muted)}
-
   .money input{
     width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
     background:var(--navy-2);color:var(--text);font-size:16px;padding:10px 12px;outline:none;
@@ -93,12 +83,9 @@
           <span class="chip">Committed: <strong id="hdrCommitted">$0.00</strong></span>
         </div>
       </div>
-
       <div class="field" style="grid-column:1 / -1">
         <label for="playerSelect">Select your name</label>
-        <select id="playerSelect">
-          <option>Loading players…</option>
-        </select>
+        <select id="playerSelect"><option>Loading players…</option></select>
       </div>
     </div>
   </header>
@@ -112,14 +99,13 @@
     <footer>Payout: negative odds → wager + (wager / |odds|) * 100; positive odds → wager + (wager / 100) * odds.</footer>
   </div>
 
-  <!-- PapaParse for CSVs -->
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
     /* ===== URLs ===== */
     const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
     const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
 
-    /* ===== Column maps for the odds sheet (must match headers) ===== */
+    /* ===== Odds sheet columns (must match headers) ===== */
     const COLS = {
       date: "Date",
       time: "Time",
@@ -137,10 +123,7 @@
       uLine: "U Line"
     };
 
-    /* ===== Player model =====
-       Header names can vary; we detect by case-insensitive match.
-    */
-    const findCol = (headers, keyLike) => headers.find(h => h && h.toLowerCase().includes(keyLike));
+    /* ===== Player structure: columns are exactly Player, Email, Begin ===== */
     let players = [];
     let currentPlayer = null;
 
@@ -148,6 +131,7 @@
     const $ = sel => document.querySelector(sel);
     const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
     const fmtMoney = v => `$${Number(v||0).toFixed(2)}`;
+    const parseMoney = v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
     function computePayout(wager, odds){
       const w = Number(wager||0), o = Number(odds);
@@ -172,7 +156,7 @@
       $("#hdrEmail").textContent = currentPlayer?.email || "—";
     }
 
-    /* ===== Pill & Row logic ===== */
+    /* ===== Pills & rows ===== */
     function pill(label, odds, gameId, group){
       const el = document.createElement("button");
       el.type = "button";
@@ -195,12 +179,12 @@
       const payoutEl = scope.querySelector(".payout");
       const warnEl = scope.querySelector(".warn");
 
-      // Enforce budget: cap this input so total never exceeds Begin
+      // Cap so total wagers never exceed Begin
       const begin = Number(currentPlayer?.begin || 0);
       const committedExcludingThis = sumCommitted() - Number(wagerInput.value||0);
       const maxAllowed = Math.max(0, begin - committedExcludingThis);
       if(Number(wagerInput.value) > maxAllowed){
-        wagerInput.value = maxAllowed.toFixed(0);
+        wagerInput.value = Math.floor(maxAllowed).toString();
         warnEl.textContent = maxAllowed === 0 ? "Budget reached." : `Capped to remaining: ${fmtMoney(maxAllowed)}`;
       } else {
         warnEl.textContent = "";
@@ -224,10 +208,8 @@
       r.className = "row";
       r.dataset.group = group;
 
-      // two pills
       r.append(pillLeft, pillRight);
 
-      // wager input
       const wagerWrap = document.createElement("div");
       wagerWrap.className = "money";
       const wagerInput = document.createElement("input");
@@ -237,7 +219,6 @@
       wagerInput.addEventListener("input", () => updateRow(r));
       wagerWrap.append(wagerInput);
 
-      // payout
       const payout = document.createElement("div");
       payout.className = "payout";
       payout.textContent = "—";
@@ -247,6 +228,7 @@
       const warn = document.createElement("div");
       warn.className = "warn";
       warn.textContent = "";
+
       const frag = document.createDocumentFragment();
       frag.append(lab, r, warn);
       return frag;
@@ -268,21 +250,16 @@
       head.append(teams, when);
       game.appendChild(head);
 
-      // Moneyline
       game.appendChild(buildRow(
         idx, "ml", "Moneyline",
         pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
         pill(row[COLS.home], row[COLS.hSu], idx, "ml")
       ));
-
-      // Spread
       game.appendChild(buildRow(
         idx, "spread", "Spread",
         pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
         pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
       ));
-
-      // Total
       game.appendChild(buildRow(
         idx, "total", "Total (O/U)",
         pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
@@ -306,18 +283,14 @@
     function loadPlayers(){
       return new Promise(resolve=>{
         Papa.parse(PLAYERS_CSV_URL, {
-          download:true, header:true, dynamicTyping:true, skipEmptyLines:true,
+          download:true, header:true, dynamicTyping:false, skipEmptyLines:true,
           complete: res => {
-            const headers = res.meta.fields || [];
-            const nameCol  = findCol(headers, "name")  || "Name";
-            const emailCol = findCol(headers, "email") || "Email";
-            const beginCol = findCol(headers, "begin") || "Begin";
-            players = (res.data || []).filter(r => r[nameCol]).map(r => ({
-              name:  r[nameCol],
-              email: r[emailCol] ?? "",
-              begin: Number(r[beginCol] ?? 0)
+            // Expect exact column names: Player, Email, Begin
+            players = (res.data || []).filter(r => r["Player"]).map(r => ({
+              name:  r["Player"],
+              email: r["Email"] ?? "",
+              begin: parseMoney(r["Begin"])
             }));
-            // Populate dropdown
             const sel = $("#playerSelect");
             sel.innerHTML = `<option value="">-- Select --</option>` + players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
             sel.addEventListener("change", () => {
