@@ -469,7 +469,8 @@
         }
       });
 
-      const totalMoney = startMoney + winnings;
+      // >>> FIXED HERE: total = currentMoney + winnings
+      const totalMoney = currentMoney + winnings;
 
       rows.push({name,currentMoney,winnings,totalMoney});
     });
@@ -492,7 +493,6 @@
     table.style.display = "table";
     statusEl.textContent = "";
   }
-
   async function init(){
     const standingsStatus = document.getElementById("standingsStatus");
     const gamesStatus = document.getElementById("gamesStatus");
