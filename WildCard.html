@@ -82,6 +82,19 @@
   }
   .warn{color:#ffd18c;font-size:.85rem;margin-top:2px}
   footer{color:var(--muted);font-size:.85rem;margin-top:18px}
+
+  /* submit button */
+  .submitBtn{
+    margin:16px 0 6px;
+    padding:10px 20px;
+    border-radius:999px;
+    border:1px solid var(--orange);
+    background:var(--orange);
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+  }
+  .submitBtn:hover{background:#ff6a1a}
 </style>
 </head>
 <body>
@@ -110,14 +123,26 @@
 
     <div id="games"></div>
 
+    <button id="submitBtn" class="submitBtn">Submit Picks</button>
+    <div id="submitStatus" class="hint"></div>
+
     <footer>Payout: negative odds → wager + (wager / |odds|) * 100; positive odds → wager + (wager / 100) * odds.</footer>
   </div>
 
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <script>
-    /* ===== URLs ===== */
+    /* ===== Config / URLs ===== */
+    const WEEK_LABEL = "Wild Card"; // change this once; header + Week column will follow
+
     const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
     const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+    // This is the sheet whose CSV you shared; to actually append rows
+    // you’ll need a Google Apps Script web app URL that writes into it.
+    const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+
+    // Replace this with your Apps Script web-app endpoint that appends to the above sheet.
+    const SUBMIT_ENDPOINT = "REPLACE_WITH_YOUR_APPS_SCRIPT_WEB_APP_URL";
 
     /* ===== Odds sheet columns ===== */
     const COLS = {
@@ -323,6 +348,64 @@
       refreshHeaderTotals();
     }
 
+    /* ===== Collect picks for submit ===== */
+    function collectPicks(){
+      const picks = [];
+      if (!currentPlayer) {
+        alert("Please select your name at the top first.");
+        return picks;
+      }
+      document.querySelectorAll(".game").forEach(game => {
+        ["ml","spread","total"].forEach(group => {
+          const row = game.querySelector(`.row[data-group="${group}"]`);
+          if (!row) return;
+          const active = row.querySelector(".pill.active");
+          const wager = Number(row.querySelector("input.wager").value || 0);
+          if (active && wager > 0){
+            const pickLabel = active.querySelector(".name").textContent.trim();
+            picks.push({
+              Week: WEEK_LABEL,
+              Name: currentPlayer.name,
+              Pick: pickLabel,
+              Wager: wager
+            });
+          }
+        });
+      });
+      return picks;
+    }
+
+    async function submitPicks(){
+      const statusEl = $("#submitStatus");
+      statusEl.textContent = "";
+      const picks = collectPicks();
+      if (!picks.length){
+        alert("No picks to submit. Make at least one selection with a wager.");
+        return;
+      }
+
+      // If no real endpoint is configured yet, just log and show a message.
+      if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
+        console.log("Picks that would be submitted to the sheet:", picks);
+        alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
+        return;
+      }
+
+      try{
+        const resp = await fetch(SUBMIT_ENDPOINT, {
+          method: "POST",
+          headers: {"Content-Type": "application/json"},
+          body: JSON.stringify({ rows: picks, week: WEEK_LABEL, targetCsv: PICKS_SHEET_CSV_URL })
+        });
+        const text = await resp.text();
+        console.log("Submit response:", text);
+        statusEl.textContent = "Picks submitted!";
+      }catch(err){
+        console.error(err);
+        statusEl.textContent = "Error submitting picks. Check console for details.";
+      }
+    }
+
     /* ===== Data loading ===== */
     function loadPlayers(){
       return new Promise(resolve=>{
@@ -349,7 +432,19 @@
       });
     }
 
-    (async function init(){await Promise.all([loadPlayers(),loadOdds()]);})();
+    (async function init(){
+      // Apply WEEK_LABEL to header & page title
+      const brandEl = document.querySelector(".brand");
+      if (brandEl){
+        brandEl.innerHTML = WEEK_LABEL + " Lines • <em>Pick’em</em>";
+      }
+      document.title = WEEK_LABEL + " Lines";
+
+      await Promise.all([loadPlayers(),loadOdds()]);
+
+      const submitBtn = $("#submitBtn");
+      if (submitBtn) submitBtn.addEventListener("click", submitPicks);
+    })();
   </script>
 </body>
 </html>
