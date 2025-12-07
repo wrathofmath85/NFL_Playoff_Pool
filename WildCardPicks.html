@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wild Card Picks – Summary</title>
+<style>
+  /* ===== Chicago Bears palette ===== */
+  :root{
+    --navy:#0B162A;
+    --navy-2:#101b33;
+    --navy-3:#0e1424;
+    --orange:#DC4405;
+    --muted:#a9b5c7;
+    --border:#27385e;
+    --text:#eef3ff;
+  }
+
+  html,body{
+    margin:0;
+    background:var(--navy);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:auto;
+    padding:16px 22px 28px;
+  }
+
+  h1{margin:10px 0 4px;}
+  h2{margin:0 0 8px;}
+  .hint{color:var(--muted);margin:0 0 16px;font-size:.9rem;}
+
+  /* Game cards */
+  .game{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+    margin:12px 0;
+  }
+  .head{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    border-bottom:1px dashed var(--border);
+    padding:0 4px 10px;
+    margin-bottom:8px;
+  }
+  .when{color:var(--muted);font-size:.92rem;}
+  .teams{font-weight:700;color:var(--orange);}
+  .rowlabel{
+    grid-column:1/-1;
+    color:var(--muted);
+    font-size:.84rem;
+    margin-top:6px;
+  }
+  .row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    align-items:stretch;
+    margin:8px 0 2px;
+  }
+  @media (max-width:780px){
+    .row{grid-template-columns:1fr;}
+  }
+
+  .pill{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:10px;
+    padding:10px;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    color:var(--orange);
+    font-weight:600;
+  }
+  .pill .odds{opacity:.9;}
+
+  .bettors{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    font-size:.82rem;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  @media (max-width:780px){
+    .bettors{grid-template-columns:1fr;}
+  }
+  .bettors strong{color:var(--text);}
+  .bettors span.name{color:var(--orange);}
+  .nobets{
+    color:var(--muted);
+    font-size:.9rem;
+    padding:6px 4px 2px;
+  }
+
+  .loading, .error{
+    color:var(--muted);
+    font-size:.9rem;
+  }
+  .error{color:#ff9b9b;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Wild Card Picks – Summary</h1>
+  <p class="hint">
+    This page shows everyone’s picks for each game. For a game row to appear, at least one person
+    must have a bet on that side (Moneyline, Spread, or Total). Games with no bets yet are still
+    listed with a simple “No bets yet”.
+  </p>
+
+  <div id="status" class="loading">Loading data…</div>
+  <div id="games"></div>
+</div>
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+  /* ===== Config / URLs ===== */
+  const WEEK_FILTER = "Wild Card"; // change if you later add Divisional, etc.
+
+  const PICKS_CSV_URL   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
+  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+  /* Odds sheet columns */
+  const COLS = {
+    date: "Date",
+    time: "Time",
+    channel: "Channel",
+    away: "Away",
+    aSu: "A SU Line",
+    aSpread: "A Spread",
+    aSpreadLine: "A Spread Line",
+    home: "Home",
+    hSu: "H SU Line",
+    hSpread: "H Spread",
+    hSpreadLine: "H Spread Line",
+    ouTotal: "Over/Under",
+    oLine: "O Line",
+    uLine: "U Line"
+  };
+
+  const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
+  const fmtMoney  = v => `$${Number(v||0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+  let picks = [];   // {Week, Name, Pick, Wager}
+  let players = []; // [{name,email,begin}]
+  let oddsRows = [];
+
+  function loadCSV(url, configOverrides={}){
+    return new Promise((resolve,reject)=>{
+      Papa.parse(url,{
+        download:true,
+        header:true,
+        dynamicTyping:true,
+        skipEmptyLines:true,
+        complete:res=>resolve(res.data || []),
+        error:err=>reject(err),
+        ...configOverrides
+      });
+    });
+  }
+
+  function groupPicksByLabel(){
+    const map = new Map(); // key: Pick label, value: array of picks
+    picks.forEach(p=>{
+      const week = p.Week || p.week || "";
+      if (WEEK_FILTER && week !== WEEK_FILTER) return; // filter by week if set
+      const key = p.Pick;
+      if (!key) return;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    });
+    return map;
+  }
+
+  function buildBettorsList(bets){
+    if (!bets || !bets.length) return "No bets";
+    return bets.map(b=>`<span class="name">${b.Name}</span> (${fmtMoney(b.Wager)})`).join(", ");
+  }
+
+  function buildGameCard(row, pickMap){
+    const game = document.createElement("section");
+    game.className = "game";
+
+    const head = document.createElement("div");
+    head.className = "head";
+    const teams = document.createElement("div");
+    teams.className = "teams";
+    teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    const when = document.createElement("div");
+    when.className = "when";
+    when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
+    head.append(teams, when);
+    game.appendChild(head);
+
+    let anyRowShown = false;
+
+    function makeRow(label, leftLabel, leftOdds, rightLabel, rightOdds){
+      const leftKey  = leftLabel;
+      const rightKey = rightLabel;
+
+      const leftBets  = pickMap.get(leftKey)  || [];
+      const rightBets = pickMap.get(rightKey) || [];
+
+      if (leftBets.length === 0 && rightBets.length === 0){
+        return; // nothing wagered on this row → skip entirely
+      }
+      anyRowShown = true;
+
+      const lab = document.createElement("div");
+      lab.className = "rowlabel";
+      lab.textContent = label;
+      game.appendChild(lab);
+
+      const r = document.createElement("div");
+      r.className = "row";
+
+      const leftPill = document.createElement("div");
+      leftPill.className = "pill";
+      leftPill.innerHTML = `<span class="name">${leftLabel}</span><span class="odds">${fmtSigned(leftOdds)}</span>`;
+
+      const rightPill = document.createElement("div");
+      rightPill.className = "pill";
+      rightPill.innerHTML = `<span class="name">${rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
+
+      r.append(leftPill, rightPill);
+      game.appendChild(r);
+
+      const b = document.createElement("div");
+      b.className = "bettors";
+      b.innerHTML = `
+        <div><strong>${leftBets.length ? "Bets:" : "No bets"}</strong> ${buildBettorsList(leftBets)}</div>
+        <div><strong>${rightBets.length ? "Bets:" : "No bets"}</strong> ${buildBettorsList(rightBets)}</div>
+      `;
+      game.appendChild(b);
+    }
+
+    // Moneyline
+    makeRow(
+      "Moneyline",
+      row[COLS.away], row[COLS.aSu],
+      row[COLS.home], row[COLS.hSu]
+    );
+
+    // Spread
+    makeRow(
+      "Spread",
+      `${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine],
+      `${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine]
+    );
+
+    // Total (O/U)
+    makeRow(
+      "Total (O/U)",
+      `Over ${row[COLS.ouTotal]}`, row[COLS.oLine],
+      `Under ${row[COLS.ouTotal]}`, row[COLS.uLine]
+    );
+
+    if (!anyRowShown){
+      const nb = document.createElement("div");
+      nb.className = "nobets";
+      nb.textContent = "No bets yet.";
+      game.appendChild(nb);
+    }
+
+    return game;
+  }
+
+  async function init(){
+    const statusEl = document.getElementById("status");
+    const gamesEl  = document.getElementById("games");
+
+    try{
+      statusEl.textContent = "Loading odds, players, and picks…";
+
+      const [oddsData, playersData, picksData] = await Promise.all([
+        loadCSV(ODDS_CSV_URL),
+        loadCSV(PLAYERS_CSV_URL),
+        loadCSV(PICKS_CSV_URL)
+      ]);
+
+      oddsRows = oddsData;
+      players = playersData; // not used yet, but available if you want extras
+      picks   = picksData;
+
+      const pickMap = groupPicksByLabel();
+
+      gamesEl.innerHTML = "";
+      oddsRows.forEach(row=>{
+        if (!(row[COLS.away] && row[COLS.home])) return;
+        const card = buildGameCard(row, pickMap);
+        gamesEl.appendChild(card);
+      });
+
+      statusEl.textContent = "";
+    }catch(err){
+      console.error(err);
+      statusEl.className = "error";
+      statusEl.textContent = "Error loading data. See console for details.";
+    }
+  }
+
+  init();
+</script>
+</body>
+</html>
