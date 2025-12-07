@@ -416,7 +416,7 @@
         Papa.parse(PLAYERS_CSV_URL,{download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
           complete:res=>{
             players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
-              name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Begin"])
+              name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Wild Card"])
             }));
             const sel=$("#playerSelect");
             sel.innerHTML=`<option value="">-- Select --</option>`+players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
