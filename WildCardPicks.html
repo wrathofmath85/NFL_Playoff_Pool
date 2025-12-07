@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Wild Card Picks – Summary</title>
+<title>Wild Card Picks – Summary & Standings</title>
 <style>
   /* ===== Chicago Bears palette ===== */
   :root{
@@ -29,10 +29,41 @@
   }
 
   h1{margin:10px 0 4px;}
-  h2{margin:0 0 8px;}
-  .hint{color:var(--muted);margin:0 0 16px;font-size:.9rem;}
+  h2{margin:16px 0 6px;}
+  .hint{color:var(--muted);margin:0 0 10px;font-size:.9rem;}
 
-  /* Game cards */
+  .loading, .error{
+    color:var(--muted);
+    font-size:.9rem;
+  }
+  .error{color:#ff9b9b;}
+
+  /* ===== Standings table ===== */
+  table{
+    border-collapse:collapse;
+    width:100%;
+    margin-bottom:18px;
+    font-size:.9rem;
+  }
+  th,td{
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+    text-align:right;
+  }
+  th:nth-child(2), td:nth-child(2){text-align:left;}
+  th{
+    background:var(--navy-2);
+    color:var(--muted);
+    font-weight:600;
+    font-size:.82rem;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  tr:nth-child(even) td{
+    background:rgba(255,255,255,0.01);
+  }
+
+  /* ===== Game cards ===== */
   .game{
     background:var(--navy-3);
     border:1px solid var(--border);
@@ -78,8 +109,16 @@
     gap:8px;
     color:var(--orange);
     font-weight:600;
+    cursor:pointer;
+    transition:background .15s,box-shadow .15s,color .15s;
   }
   .pill .odds{opacity:.9;}
+  .pill:hover{background:#16264a;color:#ff6a1a;}
+  .pill.active{
+    box-shadow:0 0 0 2px var(--orange) inset;
+    background:#1c2946;
+    color:#fff;
+  }
 
   .bettors{
     display:grid;
@@ -99,31 +138,42 @@
     font-size:.9rem;
     padding:6px 4px 2px;
   }
-
-  .loading, .error{
-    color:var(--muted);
-    font-size:.9rem;
-  }
-  .error{color:#ff9b9b;}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Wild Card Picks – Summary</h1>
+  <h1>Wild Card Picks – Summary & Standings</h1>
   <p class="hint">
-    This page shows everyone’s picks for each game. For a game row to appear, at least one person
-    must have a bet on that side (Moneyline, Spread, or Total). Games with no bets yet are still
-    listed with a simple “No bets yet”.
+    Click a side in any game below to mark it as the winner. Standings will update automatically:
+    <b>Current Money</b> = Wild Card bankroll − bets this week;
+    <b>Week Winnings</b> = profit from winning bets;
+    <b>Total Money</b> = bankroll + winnings.
   </p>
 
-  <div id="status" class="loading">Loading data…</div>
+  <h2>Standings</h2>
+  <div id="standingsStatus" class="loading">Loading data…</div>
+  <table id="standingsTable" style="display:none;">
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>Player</th>
+        <th>Current Money</th>
+        <th>Week Winnings</th>
+        <th>Total Money</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <h2>Games</h2>
+  <div id="gamesStatus" class="loading">Loading games…</div>
   <div id="games"></div>
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
   /* ===== Config / URLs ===== */
-  const WEEK_FILTER = "Wild Card"; // change if you later add Divisional, etc.
+  const WEEK_FILTER = "Wild Card"; // change if you later show Divisional, etc.
 
   const PICKS_CSV_URL   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
   const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
@@ -148,13 +198,28 @@
   };
 
   const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
-  const fmtMoney  = v => `$${Number(v||0).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+  const fmtMoney  = v => {
+    const num = Number(v||0);
+    return "$" + num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+  const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
-  let picks = [];   // {Week, Name, Pick, Wager}
-  let players = []; // [{name,email,begin}]
-  let oddsRows = [];
+  function computePayout(wager, odds){
+    const w = Number(wager||0), o = Number(odds);
+    if(!w || !o) return 0;
+    if(o < 0) return w + (w/Math.abs(o))*100;
+    return w + (w/100)*o;
+  }
 
-  function loadCSV(url, configOverrides={}){
+  let picks = [];          // raw picks
+  let players = [];        // {name,email,begin,wild}
+  let oddsRows = [];       // raw odds rows
+  let oddsMap = {};        // label -> {odds}
+  let playerStartMoney = {};   // name -> bankroll for this round (Wild Card or Begin)
+  let betsByPlayer = {};       // name -> [{label,wager,odds}]
+  const winners = new Set();   // labels of winning sides
+
+  function loadCSV(url){
     return new Promise((resolve,reject)=>{
       Papa.parse(url,{
         download:true,
@@ -162,17 +227,80 @@
         dynamicTyping:true,
         skipEmptyLines:true,
         complete:res=>resolve(res.data || []),
-        error:err=>reject(err),
-        ...configOverrides
+        error:err=>reject(err)
+      });
+    });
+  }
+
+  function buildOddsMap(){
+    oddsMap = {};
+    oddsRows.forEach(row=>{
+      if(!(row[COLS.away] && row[COLS.home])) return;
+
+      const away = row[COLS.away];
+      const home = row[COLS.home];
+
+      // Moneyline
+      oddsMap[away] = {odds: row[COLS.aSu]};
+      oddsMap[home] = {odds: row[COLS.hSu]};
+
+      // Spread
+      const aSpreadLabel = `${away} (${fmtSigned(row[COLS.aSpread])})`;
+      const hSpreadLabel = `${home} (${fmtSigned(row[COLS.hSpread])})`;
+      oddsMap[aSpreadLabel] = {odds: row[COLS.aSpreadLine]};
+      oddsMap[hSpreadLabel] = {odds: row[COLS.hSpreadLine]};
+
+      // Totals
+      const overLabel = `Over ${row[COLS.ouTotal]}`;
+      const underLabel= `Under ${row[COLS.ouTotal]}`;
+      oddsMap[overLabel]  = {odds: row[COLS.oLine]};
+      oddsMap[underLabel] = {odds: row[COLS.uLine]};
+    });
+  }
+
+  function prepPlayers(){
+    players = players.filter(p => p["Player"]);
+    players = players.map(p=>({
+      name: p["Player"],
+      email: p["Email"],
+      begin: parseMoney(p["Begin"]),
+      wild:  parseMoney(p["After Wild Card"])
+    }));
+    playerStartMoney = {};
+    players.forEach(p=>{
+      const base = p.wild || p.begin || 0;
+      playerStartMoney[p.name] = base;
+    });
+  }
+
+  function prepPicks(){
+    // keep only this week (if a week filter is set)
+    picks = picks.filter(p=>{
+      if (!WEEK_FILTER) return true;
+      return String(p.Week || "").trim() === WEEK_FILTER;
+    });
+
+    betsByPlayer = {};
+    picks.forEach(p=>{
+      const name = p.Name;
+      if (!name) return;
+      const label = p.Pick;
+      const wager = Number(p.Wager || 0);
+      const oddsObj = oddsMap[label] || {odds:0};
+      if (!betsByPlayer[name]) betsByPlayer[name] = [];
+      betsByPlayer[name].push({
+        label,
+        wager,
+        odds: oddsObj.odds
       });
     });
   }
 
   function groupPicksByLabel(){
-    const map = new Map(); // key: Pick label, value: array of picks
+    const map = new Map();
     picks.forEach(p=>{
-      const week = p.Week || p.week || "";
-      if (WEEK_FILTER && week !== WEEK_FILTER) return; // filter by week if set
+      const week = p.Week || "";
+      if (WEEK_FILTER && String(week) !== WEEK_FILTER) return;
       const key = p.Pick;
       if (!key) return;
       if (!map.has(key)) map.set(key, []);
@@ -183,7 +311,29 @@
 
   function buildBettorsList(bets){
     if (!bets || !bets.length) return "No bets";
-    return bets.map(b=>`<span class="name">${b.Name}</span> (${fmtMoney(b.Wager)})`).join(", ");
+    return bets
+      .map(b=>`<span class="name">${b.Name}</span> (${fmtMoney(b.Wager)})`)
+      .join(", ");
+  }
+
+  function registerWinnerToggle(pillEl, otherPill){
+    const label = pillEl.dataset.label;
+    pillEl.addEventListener("click", ()=>{
+      const isActive = pillEl.classList.contains("active");
+      if (isActive){
+        pillEl.classList.remove("active");
+        winners.delete(label);
+      }else{
+        pillEl.classList.add("active");
+        winners.add(label);
+        if (otherPill){
+          const otherLabel = otherPill.dataset.label;
+          otherPill.classList.remove("active");
+          winners.delete(otherLabel);
+        }
+      }
+      recalcStandings();
+    });
   }
 
   function buildGameCard(row, pickMap){
@@ -211,7 +361,7 @@
       const rightBets = pickMap.get(rightKey) || [];
 
       if (leftBets.length === 0 && rightBets.length === 0){
-        return; // nothing wagered on this row → skip entirely
+        return; // no bets—skip this row
       }
       anyRowShown = true;
 
@@ -225,11 +375,17 @@
 
       const leftPill = document.createElement("div");
       leftPill.className = "pill";
+      leftPill.dataset.label = leftLabel;
       leftPill.innerHTML = `<span class="name">${leftLabel}</span><span class="odds">${fmtSigned(leftOdds)}</span>`;
 
       const rightPill = document.createElement("div");
       rightPill.className = "pill";
+      rightPill.dataset.label = rightLabel;
       rightPill.innerHTML = `<span class="name">${rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
+
+      // winner toggle
+      registerWinnerToggle(leftPill, rightPill);
+      registerWinnerToggle(rightPill, leftPill);
 
       r.append(leftPill, rightPill);
       game.appendChild(r);
@@ -257,7 +413,7 @@
       `${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine]
     );
 
-    // Total (O/U)
+    // Totals
     makeRow(
       "Total (O/U)",
       `Over ${row[COLS.ouTotal]}`, row[COLS.oLine],
@@ -274,12 +430,75 @@
     return game;
   }
 
-  async function init(){
-    const statusEl = document.getElementById("status");
+  function renderGames(){
     const gamesEl  = document.getElementById("games");
+    const gamesStatus = document.getElementById("gamesStatus");
+    const pickMap = groupPicksByLabel();
 
+    gamesEl.innerHTML = "";
+    oddsRows.forEach(row=>{
+      if (!(row[COLS.away] && row[COLS.home])) return;
+      const card = buildGameCard(row, pickMap);
+      gamesEl.appendChild(card);
+    });
+
+    gamesStatus.textContent = "";
+  }
+
+  function recalcStandings(){
+    const tbody = document.querySelector("#standingsTable tbody");
+    const table = document.getElementById("standingsTable");
+    const statusEl = document.getElementById("standingsStatus");
+
+    const rows = [];
+
+    players.forEach(p=>{
+      const name = p.name;
+      const startMoney = playerStartMoney[name] || 0;
+      const bets = betsByPlayer[name] || [];
+
+      const totalBet = bets.reduce((sum,b)=>sum + (b.wager||0),0);
+      const currentMoney = startMoney - totalBet;
+
+      let winnings = 0;
+      bets.forEach(b=>{
+        if (winners.has(b.label)){
+          const payout = computePayout(b.wager, b.odds);
+          const profit = payout - b.wager; // winnings = profit only
+          winnings += profit;
+        }
+      });
+
+      const totalMoney = startMoney + winnings;
+
+      rows.push({name,currentMoney,winnings,totalMoney});
+    });
+
+    rows.sort((a,b)=>b.totalMoney - a.totalMoney);
+
+    tbody.innerHTML = "";
+    rows.forEach((r,idx)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${r.name}</td>
+        <td>${fmtMoney(r.currentMoney)}</td>
+        <td>${fmtMoney(r.winnings)}</td>
+        <td>${fmtMoney(r.totalMoney)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    table.style.display = "table";
+    statusEl.textContent = "";
+  }
+
+  async function init(){
+    const standingsStatus = document.getElementById("standingsStatus");
+    const gamesStatus = document.getElementById("gamesStatus");
     try{
-      statusEl.textContent = "Loading odds, players, and picks…";
+      standingsStatus.textContent = "Loading odds, players, and picks…";
+      gamesStatus.textContent = "Loading games…";
 
       const [oddsData, playersData, picksData] = await Promise.all([
         loadCSV(ODDS_CSV_URL),
@@ -288,23 +507,21 @@
       ]);
 
       oddsRows = oddsData;
-      players = playersData; // not used yet, but available if you want extras
-      picks   = picksData;
+      players  = playersData;
+      picks    = picksData;
 
-      const pickMap = groupPicksByLabel();
+      buildOddsMap();
+      prepPlayers();
+      prepPicks();
 
-      gamesEl.innerHTML = "";
-      oddsRows.forEach(row=>{
-        if (!(row[COLS.away] && row[COLS.home])) return;
-        const card = buildGameCard(row, pickMap);
-        gamesEl.appendChild(card);
-      });
-
-      statusEl.textContent = "";
+      renderGames();
+      recalcStandings();
     }catch(err){
       console.error(err);
-      statusEl.className = "error";
-      statusEl.textContent = "Error loading data. See console for details.";
+      standingsStatus.className = "error";
+      standingsStatus.textContent = "Error loading data. See console for details.";
+      gamesStatus.className = "error";
+      gamesStatus.textContent = "Error loading data.";
     }
   }
 
