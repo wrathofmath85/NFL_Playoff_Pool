@@ -12,32 +12,33 @@
     --navy-3:#0e1424;
     --orange:#DC4405;
     --muted:#a9b5c7;
-    --border:#1e2a45;
+    --border:#27385e;
     --text:#eef3ff;
   }
+
   html,body{margin:0;background:var(--navy);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
   .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
 
   /* ===== Sticky header ===== */
   .topbar{
-    position:sticky; top:0; z-index:50;
+    position:sticky;top:0;z-index:50;
     backdrop-filter:saturate(130%) blur(4px);
     background:color-mix(in srgb, var(--navy) 85%, black 15%);
     border-bottom:2px solid var(--orange);
   }
-  .topbar .inner{max-width:1100px;margin:auto;padding:10px 22px;display:grid;gap:10px;grid-template-columns: 1fr repeat(3, minmax(140px,auto));align-items:end}
+  .topbar .inner{max-width:1100px;margin:auto;padding:10px 22px;display:grid;gap:10px;grid-template-columns:1fr repeat(3,minmax(140px,auto));align-items:end}
   .brand{font-weight:800;letter-spacing:.3px}
   .brand em{color:var(--orange);font-style:normal}
   .field{display:flex;flex-direction:column;gap:6px}
   .field label{font-size:.78rem;color:var(--muted)}
-  select, input.read{
+  select,input.read{
     appearance:none;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
     background:var(--navy-2);color:var(--text);padding:10px 12px;font-size:15px;outline:none;
   }
   .totals{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
   .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
   .chip strong{color:var(--orange)}
-  @media (max-width:860px){ .topbar .inner{grid-template-columns:1fr} .field{max-width:100%} }
+  @media (max-width:860px){.topbar .inner{grid-template-columns:1fr}.field{max-width:100%}}
 
   /* ===== Games ===== */
   h1{margin:14px 0 8px}
@@ -45,26 +46,39 @@
   .game{background:var(--navy-3);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px 0}
   .head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:0 4px 10px;margin-bottom:8px}
   .when{color:var(--muted);font-size:.92rem}
-  .teams{font-weight:700}
-  .rowlabel{grid-column:1 / -1;color:var(--muted);font-size:.84rem;margin-top:6px}
+  .teams{font-weight:700;color:var(--orange)}
+  .rowlabel{grid-column:1/-1;color:var(--muted);font-size:.84rem;margin-top:6px}
   .row{display:grid;grid-template-columns:1fr 1fr 120px 140px;gap:8px;align-items:stretch;margin:8px 0}
-  @media (max-width:780px){ .row{grid-template-columns:1fr} }
+  @media (max-width:780px){.row{grid-template-columns:1fr}}
+
   .pill{
-    border:1px solid var(--border);background:var(--navy-2);border-radius:10px;
-    padding:10px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;
-    transition:background .15s,box-shadow .15s;
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:10px;
+    padding:10px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    color:var(--orange);
+    font-weight:600;
+    transition:background .15s,box-shadow .15s,color .15s;
   }
-  .pill:hover{background:#15223b}
-  .pill.active{box-shadow:0 0 0 2px var(--orange) inset;background:#1c2946}
-  .pill .name{font-weight:700}
-  .pill .odds{color:var(--muted)}
+  .pill:hover{background:#16264a;color:#ff6a1a}
+  .pill.active{
+    box-shadow:0 0 0 2px var(--orange) inset;
+    background:#1c2946;
+    color:#fff;
+  }
+  .pill .odds{opacity:.9}
+
   .money input{
     width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
     background:var(--navy-2);color:var(--text);font-size:16px;padding:10px 12px;outline:none;
   }
   .payout{
     background:var(--navy-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;
-    font-weight:800
+    font-weight:800;color:var(--orange)
   }
   .warn{color:#ffd18c;font-size:.85rem;margin-top:2px}
   footer{color:var(--muted);font-size:.85rem;margin-top:18px}
@@ -105,7 +119,7 @@
     const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
     const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
 
-    /* ===== Odds sheet columns (must match headers) ===== */
+    /* ===== Odds sheet columns ===== */
     const COLS = {
       date: "Date",
       time: "Time",
@@ -123,11 +137,9 @@
       uLine: "U Line"
     };
 
-    /* ===== Player structure: columns are exactly Player, Email, Begin ===== */
     let players = [];
     let currentPlayer = null;
 
-    /* ===== Helpers ===== */
     const $ = sel => document.querySelector(sel);
     const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
     const fmtMoney = v => `$${Number(v||0).toFixed(2)}`;
@@ -156,7 +168,6 @@
       $("#hdrEmail").textContent = currentPlayer?.email || "—";
     }
 
-    /* ===== Pills & rows ===== */
     function pill(label, odds, gameId, group){
       const el = document.createElement("button");
       el.type = "button";
@@ -179,7 +190,6 @@
       const payoutEl = scope.querySelector(".payout");
       const warnEl = scope.querySelector(".warn");
 
-      // Cap so total wagers never exceed Begin
       const begin = Number(currentPlayer?.begin || 0);
       const committedExcludingThis = sumCommitted() - Number(wagerInput.value||0);
       const maxAllowed = Math.max(0, begin - committedExcludingThis);
@@ -207,7 +217,6 @@
       const r = document.createElement("div");
       r.className = "row";
       r.dataset.group = group;
-
       r.append(pillLeft, pillRight);
 
       const wagerWrap = document.createElement("div");
@@ -250,21 +259,15 @@
       head.append(teams, when);
       game.appendChild(head);
 
-      game.appendChild(buildRow(
-        idx, "ml", "Moneyline",
+      game.appendChild(buildRow(idx, "ml", "Moneyline",
         pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
-        pill(row[COLS.home], row[COLS.hSu], idx, "ml")
-      ));
-      game.appendChild(buildRow(
-        idx, "spread", "Spread",
+        pill(row[COLS.home], row[COLS.hSu], idx, "ml")));
+      game.appendChild(buildRow(idx, "spread", "Spread",
         pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
-        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
-      ));
-      game.appendChild(buildRow(
-        idx, "total", "Total (O/U)",
+        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")));
+      game.appendChild(buildRow(idx, "total", "Total (O/U)",
         pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
-        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")
-      ));
+        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")));
 
       return game;
     }
@@ -279,42 +282,29 @@
       refreshHeaderTotals();
     }
 
-    /* ===== Data loading ===== */
     function loadPlayers(){
       return new Promise(resolve=>{
-        Papa.parse(PLAYERS_CSV_URL, {
-          download:true, header:true, dynamicTyping:false, skipEmptyLines:true,
-          complete: res => {
-            // Expect exact column names: Player, Email, Begin
-            players = (res.data || []).filter(r => r["Player"]).map(r => ({
-              name:  r["Player"],
-              email: r["Email"] ?? "",
-              begin: parseMoney(r["Begin"])
+        Papa.parse(PLAYERS_CSV_URL,{download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+          complete:res=>{
+            players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
+              name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Begin"])
             }));
-            const sel = $("#playerSelect");
-            sel.innerHTML = `<option value="">-- Select --</option>` + players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
-            sel.addEventListener("change", () => {
-              currentPlayer = players[sel.value] ?? null;
-              refreshHeaderTotals();
-            });
+            const sel=$("#playerSelect");
+            sel.innerHTML=`<option value="">-- Select --</option>`+players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
+            sel.addEventListener("change",()=>{currentPlayer=players[sel.value]??null;refreshHeaderTotals();});
             resolve();
-          }
-        });
+          }});
       });
     }
 
     function loadOdds(){
       return new Promise(resolve=>{
-        Papa.parse(ODDS_CSV_URL, {
-          download:true, header:true, dynamicTyping:true, skipEmptyLines:true,
-          complete: res => { renderGames(res.data || []); resolve(); }
-        });
+        Papa.parse(ODDS_CSV_URL,{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
+          complete:res=>{renderGames(res.data||[]);resolve();}});
       });
     }
 
-    (async function init(){
-      await Promise.all([loadPlayers(), loadOdds()]);
-    })();
+    (async function init(){await Promise.all([loadPlayers(),loadOdds()]);})();
   </script>
 </body>
 </html>
