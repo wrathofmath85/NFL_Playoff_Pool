@@ -140,10 +140,11 @@
     let players = [];
     let currentPlayer = null;
 
+    /* ===== Helpers ===== */
     const $ = sel => document.querySelector(sel);
     const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
-    const fmtMoney = v => `$${Number(v||0).toFixed(2)}`;
-    const parseMoney = v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
+    const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
+    const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
     function computePayout(wager, odds){
       const w = Number(wager||0), o = Number(odds);
@@ -163,49 +164,73 @@
       const begin = Number(currentPlayer?.begin || 0);
       const remaining = Math.max(0, begin - committed);
       $("#hdrCommitted").textContent = fmtMoney(committed);
-      $("#hdrRemain").textContent = fmtMoney(remaining);
-      $("#hdrBegin").textContent = fmtMoney(begin);
-      $("#hdrEmail").textContent = currentPlayer?.email || "—";
+      $("#hdrRemain").textContent    = fmtMoney(remaining);
+      $("#hdrBegin").textContent     = fmtMoney(begin);
+      $("#hdrEmail").textContent     = currentPlayer?.email || "—";
     }
 
+    /* ===== Pill & Row logic ===== */
     function pill(label, odds, gameId, group){
       const el = document.createElement("button");
       el.type = "button";
       el.className = "pill";
       el.dataset.gameId = gameId;
-      el.dataset.group = group;
-      el.dataset.odds = odds ?? "";
+      el.dataset.group  = group;   // ml | spread | total
+      el.dataset.odds   = odds ?? "";
       el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
+
       el.addEventListener("click", () => {
         const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
-        scope.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));
-        el.classList.add("active");
-        updateRow(scope);
+        const wasActive = el.classList.contains("active");
+
+        // Toggle: if already active, unselect; else select and clear other in row
+        if (wasActive) {
+          el.classList.remove("active");
+        } else {
+          scope.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));
+          el.classList.add("active");
+        }
+        updateRow(scope);      // Recompute payout display for this row
+        refreshHeaderTotals(); // Always keep header totals fresh
       });
+
       return el;
     }
 
     function updateRow(scope){
       const wagerInput = scope.querySelector("input.wager");
-      const payoutEl = scope.querySelector(".payout");
-      const warnEl = scope.querySelector(".warn");
+      const payoutEl   = scope.querySelector(".payout");
+      const warnEl     = scope.nextElementSibling?.classList.contains("warn") ? scope.nextElementSibling : null;
 
+      // ----- Budget clamp for this one input -----
       const begin = Number(currentPlayer?.begin || 0);
-      const committedExcludingThis = sumCommitted() - Number(wagerInput.value||0);
-      const maxAllowed = Math.max(0, begin - committedExcludingThis);
-      if(Number(wagerInput.value) > maxAllowed){
-        wagerInput.value = Math.floor(maxAllowed).toString();
-        warnEl.textContent = maxAllowed === 0 ? "Budget reached." : `Capped to remaining: ${fmtMoney(maxAllowed)}`;
-      } else {
+      const before = Number(wagerInput.value || 0);
+
+      // Current total including this input
+      const totalNow = sumCommitted();
+      // If over budget, reduce only this input by the overage
+      const over = Math.max(0, totalNow - begin);
+      if (over > 0) {
+        const newVal = Math.max(0, before - over);
+        wagerInput.value = Math.floor(newVal).toString();
+        if (warnEl) warnEl.textContent = newVal === 0 ? "Budget reached." : `Capped to remaining.`;
+      } else if (warnEl) {
         warnEl.textContent = "";
       }
 
       const active = scope.querySelector(".pill.active");
-      const wager = Number(wagerInput.value||0);
-      if(!active || !wager){ payoutEl.textContent = "—"; refreshHeaderTotals(); return; }
+      const wager  = Number(wagerInput.value||0);
+
+      if(!active || !wager){
+        payoutEl.textContent = "—";
+        refreshHeaderTotals();
+        return;
+      }
+
       const odds = Number(active.dataset.odds);
       const total = computePayout(wager, odds);
       payoutEl.textContent = isFinite(total) ? fmtMoney(total) : "—";
+
       refreshHeaderTotals();
     }
 
@@ -217,15 +242,20 @@
       const r = document.createElement("div");
       r.className = "row";
       r.dataset.group = group;
+
       r.append(pillLeft, pillRight);
 
       const wagerWrap = document.createElement("div");
       wagerWrap.className = "money";
       const wagerInput = document.createElement("input");
-      wagerInput.type = "number"; wagerInput.min = "0"; wagerInput.step = "1";
+      wagerInput.type = "number";
+      wagerInput.min = "0";
+      wagerInput.step = "1";
       wagerInput.placeholder = "Wager";
       wagerInput.className = "wager";
-      wagerInput.addEventListener("input", () => updateRow(r));
+      wagerInput.addEventListener("input", () => {
+        updateRow(r);           // Recompute this row’s payout
+      });
       wagerWrap.append(wagerInput);
 
       const payout = document.createElement("div");
@@ -259,15 +289,26 @@
       head.append(teams, when);
       game.appendChild(head);
 
-      game.appendChild(buildRow(idx, "ml", "Moneyline",
+      // Moneyline
+      game.appendChild(buildRow(
+        idx, "ml", "Moneyline",
         pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
-        pill(row[COLS.home], row[COLS.hSu], idx, "ml")));
-      game.appendChild(buildRow(idx, "spread", "Spread",
+        pill(row[COLS.home], row[COLS.hSu], idx, "ml")
+      ));
+
+      // Spread
+      game.appendChild(buildRow(
+        idx, "spread", "Spread",
         pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
-        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")));
-      game.appendChild(buildRow(idx, "total", "Total (O/U)",
+        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
+      ));
+
+      // Total
+      game.appendChild(buildRow(
+        idx, "total", "Total (O/U)",
         pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
-        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")));
+        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")
+      ));
 
       return game;
     }
@@ -282,6 +323,7 @@
       refreshHeaderTotals();
     }
 
+    /* ===== Data loading ===== */
     function loadPlayers(){
       return new Promise(resolve=>{
         Papa.parse(PLAYERS_CSV_URL,{download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
@@ -291,7 +333,10 @@
             }));
             const sel=$("#playerSelect");
             sel.innerHTML=`<option value="">-- Select --</option>`+players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
-            sel.addEventListener("change",()=>{currentPlayer=players[sel.value]??null;refreshHeaderTotals();});
+            sel.addEventListener("change",()=>{
+              currentPlayer=players[sel.value]??null;
+              refreshHeaderTotals();
+            });
             resolve();
           }});
       });
