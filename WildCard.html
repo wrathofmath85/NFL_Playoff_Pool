@@ -392,11 +392,20 @@
       }
 
       try{
+        // send as x-www-form-urlencoded so it’s a “simple” POST (no CORS preflight)
+        const params = new URLSearchParams();
+        params.append("data", JSON.stringify({
+          rows: picks,
+          week: WEEK_LABEL,
+          targetCsv: PICKS_SHEET_CSV_URL
+        }));
+
         const resp = await fetch(SUBMIT_ENDPOINT, {
           method: "POST",
-          headers: {"Content-Type": "application/json"},
-          body: JSON.stringify({ rows: picks, week: WEEK_LABEL, targetCsv: PICKS_SHEET_CSV_URL })
+          body: params
+          // no custom headers → browser uses application/x-www-form-urlencoded
         });
+
         const text = await resp.text();
         console.log("Submit response:", text);
         statusEl.textContent = "Picks submitted!";
@@ -404,7 +413,6 @@
         console.error(err);
         statusEl.textContent = "Error submitting picks. Check console for details.";
       }
-    }
 
     /* ===== Data loading ===== */
     function loadPlayers(){
