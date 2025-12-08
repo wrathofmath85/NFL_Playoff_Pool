@@ -1,22 +1,3 @@
-  /* ===== Config / URLs ===== */
-
-  // Go-live time in Eastern. Use -05:00 for EST, -04:00 for EDT.
-  // Example: Jan 10, 2025 at 6:00 PM Eastern Standard Time
-  const GO_LIVE_ISO = "2026-01-10T18:00:00-05:00";
-  const GO_LIVE = new Date(GO_LIVE_ISO);
-
-  const WEEK_LABEL = "Wild Card"; // header + Week column
-
-  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
-  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
-
-  // Published CSV (read-only) – kept for reference
-  const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
-
-  // Apps Script web-app URL that appends to the sheet
-  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
-
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -206,6 +187,23 @@
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
+  /* ===== Config / URLs ===== */
+
+  // Go-live time in Eastern. Use -05:00 for EST, -04:00 for EDT.
+  // Example: Jan 10, 2025 at 6:00 PM Eastern Standard Time
+  const GO_LIVE_ISO = "2026-01-10T18:00:00-05:00";
+  const GO_LIVE = new Date(GO_LIVE_ISO);
+
+  const WEEK_LABEL = "Wild Card"; // header + Week column
+
+  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
+  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+  // Published CSV (read-only) – kept for reference
+  const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+
+  // Apps Script web-app URL that appends to the sheet
+  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
 
   /* ===== Odds sheet columns ===== */
   const COLS = {
