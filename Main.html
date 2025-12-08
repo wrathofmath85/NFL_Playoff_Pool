@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Playoff Pick'em Hub</title>
+  <style>
+    /* ===== Chicago Bears palette ===== */
+    :root{
+      --navy:#0B162A;
+      --navy-2:#101b33;
+      --navy-3:#0e1424;
+      --orange:#DC4405;
+      --muted:#a9b5c7;
+      --border:#27385e;
+      --text:#eef3ff;
+    }
+
+    *{box-sizing:border-box;}
+
+    html,body{
+      margin:0;
+      padding:0;
+      background:radial-gradient(circle at top,#182748 0,var(--navy) 45%,#050813 100%);
+      color:var(--text);
+      font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+    }
+
+    .wrap{
+      max-width:1100px;
+      margin:0 auto;
+      padding:24px 18px 40px;
+    }
+
+    header{
+      display:flex;
+      align-items:center;
+      gap:18px;
+      margin-bottom:22px;
+      flex-wrap:wrap;
+    }
+
+    .logoBall{
+      width:60px;
+      height:36px;
+      border-radius:999px;
+      background:linear-gradient(135deg,#8a4a12,#5b2d08);
+      border:2px solid #f7d7a5;
+      position:relative;
+      box-shadow:0 0 0 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.7);
+    }
+    .logoBall::before,
+    .logoBall::after{
+      content:"";
+      position:absolute;
+      top:50%;
+      width:12px;
+      height:2px;
+      background:#f7d7a5;
+      transform:translateY(-50%);
+    }
+    .logoBall::before{left:10px;box-shadow:0 -6px 0 #f7d7a5,0 6px 0 #f7d7a5;}
+    .logoBall::after{right:10px;box-shadow:0 -6px 0 #f7d7a5,0 6px 0 #f7d7a5;}
+    .laces{
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:26px;
+      height:3px;
+      background:#f7d7a5;
+      transform:translate(-50%,-50%);
+      border-radius:6px;
+    }
+    .laces span{
+      position:absolute;
+      width:2px;
+      height:9px;
+      background:#f7d7a5;
+      top:50%;
+      transform:translateY(-50%);
+    }
+    .laces span:nth-child(1){left:4px;}
+    .laces span:nth-child(2){left:10px;}
+    .laces span:nth-child(3){left:16px;}
+    .laces span:nth-child(4){left:22px;}
+
+    h1{
+      margin:0;
+      font-size:1.6rem;
+      letter-spacing:.03em;
+    }
+    h1 span{
+      color:var(--orange);
+    }
+    .subtitle{
+      margin-top:2px;
+      font-size:.9rem;
+      color:var(--muted);
+    }
+
+    /* Info strip */
+    .infoStrip{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-bottom:22px;
+    }
+    .tag{
+      padding:6px 12px;
+      border-radius:999px;
+      border:1px solid var(--border);
+      background:rgba(9,18,40,.8);
+      font-size:.8rem;
+      color:var(--muted);
+    }
+    .tag b{color:var(--orange);}
+
+    /* Grid of rounds */
+    .grid{
+      display:grid;
+      gap:16px;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+    }
+    @media (max-width:720px){
+      .grid{grid-template-columns:1fr;}
+    }
+
+    .card{
+      background:linear-gradient(145deg,var(--navy-3),var(--navy-2));
+      border-radius:18px;
+      border:1px solid var(--border);
+      padding:16px 16px 14px;
+      box-shadow:0 10px 25px rgba(0,0,0,.55);
+      position:relative;
+      overflow:hidden;
+    }
+    .card::after{
+      content:"";
+      position:absolute;
+      inset:-40%;
+      background:radial-gradient(circle at top right,rgba(220,68,5,.18),transparent 55%);
+      opacity:.8;
+      pointer-events:none;
+    }
+    .cardHeader{
+      position:relative;
+      z-index:1;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      margin-bottom:10px;
+    }
+    .cardTitle{
+      font-size:1.05rem;
+      font-weight:700;
+    }
+    .cardTitle span{
+      color:var(--orange);
+    }
+    .roundTag{
+      font-size:.76rem;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+      color:var(--muted);
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.2);
+      padding:4px 10px;
+      background:rgba(3,8,20,.9);
+    }
+
+    .cardBody{
+      position:relative;
+      z-index:1;
+    }
+    .cardBody p{
+      margin:0 0 10px;
+      font-size:.85rem;
+      color:var(--muted);
+    }
+
+    .linkRow{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+      margin-top:4px;
+    }
+    .btnLink{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:7px 13px;
+      border-radius:999px;
+      font-size:.85rem;
+      font-weight:600;
+      text-decoration:none;
+      cursor:pointer;
+    }
+    .btnPrimary{
+      background:var(--orange);
+      color:#fff;
+      border:1px solid var(--orange);
+    }
+    .btnPrimary:hover{
+      background:#ff6a1a;
+    }
+    .btnGhost{
+      background:rgba(8,14,30,.9);
+      color:var(--text);
+      border:1px solid var(--border);
+    }
+    .btnGhost:hover{
+      border-color:var(--orange);
+      color:var(--orange);
+    }
+
+    .btnIcon{
+      font-size:.8rem;
+      line-height:1;
+    }
+
+    footer{
+      margin-top:26px;
+      font-size:.78rem;
+      color:var(--muted);
+      text-align:center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logoBall" aria-hidden="true">
+        <div class="laces">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+      <div>
+        <h1><span>Playoff</span> Pick’em Hub</h1>
+        <div class="subtitle">Jump to any round to view the lines or everyone’s picks.</div>
+      </div>
+    </header>
+
+    <div class="infoStrip">
+      <div class="tag"><b>Tip:</b> Bookmark this hub – all weekly links live here.</div>
+      <div class="tag">Links will go live as each round opens.</div>
+    </div>
+
+    <main class="grid">
+      <!-- Wild Card -->
+      <section class="card">
+        <div class="cardHeader">
+          <div class="cardTitle"><span>Wild Card</span> Weekend</div>
+          <div class="roundTag">Round 1</div>
+        </div>
+        <div class="cardBody">
+          <p>View the Wild Card lines or check everyone’s picks and standings.</p>
+          <div class="linkRow">
+            <!-- TODO: replace # with your Wild Card lines URL -->
+            <a class="btnLink btnPrimary" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/WildCard">
+              <span class="btnIcon">🏈</span>
+              <span>Lines / Make Picks</span>
+            </a>
+            <!-- TODO: replace # with your Wild Card picks/summary URL -->
+            <a class="btnLink btnGhost" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/WildCardPicks">
+              <span class="btnIcon">📊</span>
+              <span>Picks & Standings</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Divisional -->
+      <section class="card">
+        <div class="cardHeader">
+          <div class="cardTitle"><span>Divisional</span> Round</div>
+          <div class="roundTag">Round 2</div>
+        </div>
+        <div class="cardBody">
+          <p>Lines and group picks for the Divisional round once it opens.</p>
+          <div class="linkRow">
+            <!-- TODO: replace # with your Divisional lines URL -->
+            <a class="btnLink btnPrimary" href="#">
+              <span class="btnIcon">🏈</span>
+              <span>Lines / Make Picks</span>
+            </a>
+            <!-- TODO: replace # with your Divisional picks/summary URL -->
+            <a class="btnLink btnGhost" href="#">
+              <span class="btnIcon">📊</span>
+              <span>Picks & Standings</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Conference Championships -->
+      <section class="card">
+        <div class="cardHeader">
+          <div class="cardTitle"><span>Conference</span> Championships</div>
+          <div class="roundTag">Round 3</div>
+        </div>
+        <div class="cardBody">
+          <p>Track who’s still alive heading into Championship Sunday.</p>
+          <div class="linkRow">
+            <!-- TODO: replace # with your Conference lines URL -->
+            <a class="btnLink btnPrimary" href="#">
+              <span class="btnIcon">🏈</span>
+              <span>Lines / Make Picks</span>
+            </a>
+            <!-- TODO: replace # with your Conference picks/summary URL -->
+            <a class="btnLink btnGhost" href="#">
+              <span class="btnIcon">📊</span>
+              <span>Picks & Standings</span>
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Super Bowl -->
+      <section class="card">
+        <div class="cardHeader">
+          <div class="cardTitle"><span>Super Bowl</span> Finale</div>
+          <div class="roundTag">Round 4</div>
+        </div>
+        <div class="cardBody">
+          <p>The final round: big game lines and the last round of picks.</p>
+          <div class="linkRow">
+            <!-- TODO: replace # with your Super Bowl lines URL -->
+            <a class="btnLink btnPrimary" href="#">
+              <span class="btnIcon">🏈</span>
+              <span>Lines / Make Picks</span>
+            </a>
+            <!-- TODO: replace # with your Super Bowl picks/summary URL -->
+            <a class="btnLink btnGhost" href="#">
+              <span class="btnIcon">📊</span>
+              <span>Picks & Standings</span>
+            </a>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      GitHub Pages • Playoff Pick’em · Update the link URLs in this file as each round goes live.
+    </footer>
+  </div>
+</body>
+</html>
