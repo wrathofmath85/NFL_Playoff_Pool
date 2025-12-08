@@ -26,7 +26,12 @@
     background:color-mix(in srgb, var(--navy) 85%, black 15%);
     border-bottom:2px solid var(--orange);
   }
-  .topbar .inner{max-width:1100px;margin:auto;padding:10px 22px;display:grid;gap:10px;grid-template-columns:1fr repeat(3,minmax(140px,auto));align-items:end}
+  .topbar .inner{
+    max-width:1100px;margin:auto;padding:10px 22px;
+    display:grid;gap:10px;
+    grid-template-columns:1fr repeat(3,minmax(140px,auto));
+    align-items:end
+  }
   .brand{font-weight:800;letter-spacing:.3px}
   .brand em{color:var(--orange);font-style:normal}
   .field{display:flex;flex-direction:column;gap:6px}
@@ -35,10 +40,16 @@
     appearance:none;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
     background:var(--navy-2);color:var(--text);padding:10px 12px;font-size:15px;outline:none;
   }
-  .totals{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .totals{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px
+  }
   .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
   .chip strong{color:var(--orange)}
-  @media (max-width:860px){.topbar .inner{grid-template-columns:1fr}.field{max-width:100%}}
+  @media (max-width:860px){
+    .topbar .inner{grid-template-columns:1fr}
+    .field{max-width:100%}
+    .totals{justify-content:flex-start}
+  }
 
   /* ===== Games ===== */
   h1{margin:14px 0 8px}
@@ -83,18 +94,32 @@
   .warn{color:#ffd18c;font-size:.85rem;margin-top:2px}
   footer{color:var(--muted);font-size:.85rem;margin-top:18px}
 
-  /* submit button */
+  /* submit button in header */
   .submitBtn{
-    margin:16px 0 6px;
-    padding:10px 20px;
+    padding:8px 18px;
     border-radius:999px;
     border:1px solid var(--orange);
     background:var(--orange);
     color:#fff;
     font-weight:700;
     cursor:pointer;
+    font-size:.9rem;
   }
-  .submitBtn:hover{background:#ff6a1a}
+  .submitBtn[disabled]{opacity:.6;cursor:default}
+  .submitBtn:hover:not([disabled]){background:#ff6a1a}
+
+  /* spinner */
+  .spinner{
+    width:18px;height:18px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;
+    animation:spin .7s linear infinite;
+    display:none;
+  }
+  @keyframes spin{
+    to{transform:rotate(360deg);}
+  }
 </style>
 </head>
 <body>
@@ -108,6 +133,8 @@
           <span class="chip">Begin: <strong id="hdrBegin">$0.00</strong></span>
           <span class="chip">Remaining: <strong id="hdrRemain">$0.00</strong></span>
           <span class="chip">Committed: <strong id="hdrCommitted">$0.00</strong></span>
+          <button id="submitBtn" class="submitBtn">Submit Picks</button>
+          <div id="submitSpinner" class="spinner" aria-hidden="true"></div>
         </div>
       </div>
       <div class="field" style="grid-column:1 / -1">
@@ -123,7 +150,6 @@
 
     <div id="games"></div>
 
-    <button id="submitBtn" class="submitBtn">Submit Picks</button>
     <div id="submitStatus" class="hint"></div>
 
     <footer>Payout: negative odds → wager + (wager / |odds|) * 100; positive odds → wager + (wager / 100) * odds.</footer>
@@ -226,11 +252,9 @@
       const payoutEl   = scope.querySelector(".payout");
       const warnEl     = scope.nextElementSibling?.classList.contains("warn") ? scope.nextElementSibling : null;
 
-      // ----- Budget clamp for this one input -----
       const begin = Number(currentPlayer?.begin || 0);
       const before = Number(wagerInput.value || 0);
 
-      // Current total including this input
       const totalNow = sumCommitted();
       const over = Math.max(0, totalNow - begin);
       if (over > 0) {
@@ -374,12 +398,15 @@
     }
 
     async function submitPicks(){
-      const statusEl = $("#submitStatus");
+      const statusEl  = $("#submitStatus");
+      const btn       = $("#submitBtn");
+      const spinner   = $("#submitSpinner");
+
       statusEl.textContent = "";
+
       const picks = collectPicks();
       if (!picks.length){
-        alert("No picks to submit. Make at least one selection with a wager.");
-        return;
+        return; // collectPicks already alerted
       }
 
       if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
@@ -387,6 +414,11 @@
         alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
         return;
       }
+
+      // UI: show spinner / disable button
+      btn.disabled = true;
+      btn.textContent = "Submitting…";
+      if (spinner) spinner.style.display = "inline-block";
 
       try{
         const params = new URLSearchParams();
@@ -404,22 +436,30 @@
         const text = await resp.text();
         console.log("Submit response:", text);
         statusEl.textContent = "Picks submitted!";
+        alert("Your picks for " + WEEK_LABEL + " have been submitted.");
       }catch(err){
         console.error(err);
         statusEl.textContent = "Error submitting picks. Check console for details.";
+        alert("There was an error submitting your picks. Please try again.");
+      }finally{
+        btn.disabled = false;
+        btn.textContent = "Submit Picks";
+        if (spinner) spinner.style.display = "none";
       }
-    }  // <--- this was missing
+    }
 
     /* ===== Data loading ===== */
     function loadPlayers(){
       return new Promise(resolve=>{
-        Papa.parse(PLAYERS_CSV_URL,{download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+        Papa.parse(PLAYERS_CSV_URL,{
+          download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
           complete:res=>{
             players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
               name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Wild Card"])
             }));
             const sel=$("#playerSelect");
-            sel.innerHTML=`<option value="">-- Select --</option>`+players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
+            sel.innerHTML=`<option value="">-- Select --</option>`+
+              players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
             sel.addEventListener("change",()=>{
               currentPlayer=players[sel.value]??null;
               refreshHeaderTotals();
@@ -431,8 +471,10 @@
 
     function loadOdds(){
       return new Promise(resolve=>{
-        Papa.parse(ODDS_CSV_URL,{download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
-          complete:res=>{renderGames(res.data||[]);resolve();}});
+        Papa.parse(ODDS_CSV_URL,{
+          download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
+          complete:res=>{renderGames(res.data||[]);resolve();}
+        });
       });
     }
 
