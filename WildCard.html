@@ -1,3 +1,22 @@
+  /* ===== Config / URLs ===== */
+
+  // Go-live time in Eastern. Use -05:00 for EST, -04:00 for EDT.
+  // Example: Jan 10, 2025 at 6:00 PM Eastern Standard Time
+  const GO_LIVE_ISO = "2026-01-10T18:00:00-05:00";
+  const GO_LIVE = new Date(GO_LIVE_ISO);
+
+  const WEEK_LABEL = "Wild Card"; // header + Week column
+
+  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
+  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+  // Published CSV (read-only) – kept for reference
+  const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+
+  // Apps Script web-app URL that appends to the sheet
+  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -18,6 +37,24 @@
 
   html,body{margin:0;background:var(--navy);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
   .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
+
+  /* ===== Coming soon screen ===== */
+  #comingSoon{
+    display:none;
+    min-height:100vh;
+    box-sizing:border-box;
+    padding:40px 20px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+  }
+  #comingSoon .csBox{
+    max-width:480px;
+    margin:auto;
+  }
+  #comingSoon h1{margin-bottom:10px;}
+  #comingSoon p{color:var(--muted);font-size:0.95rem;}
 
   /* ===== Sticky header ===== */
   .topbar{
@@ -123,6 +160,17 @@
 </style>
 </head>
 <body>
+
+<!-- Coming soon gate -->
+<div id="comingSoon">
+  <div class="csBox">
+    <h1>Wild Card Lines</h1>
+    <p>The Wild Card picks page will open soon. Check back at kickoff time!</p>
+  </div>
+</div>
+
+<!-- Main app (hidden until go-live) -->
+<div id="mainApp" style="display:none;">
   <!-- ===== Sticky header ===== -->
   <header class="topbar">
     <div class="inner">
@@ -154,343 +202,356 @@
 
     <footer>Payout: negative odds → wager + (wager / |odds|) * 100; positive odds → wager + (wager / 100) * odds.</footer>
   </div>
+</div>
 
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-  <script>
-    /* ===== Config / URLs ===== */
-    const WEEK_LABEL = "Wild Card"; // change this once; header + Week column will follow
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
 
-    const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
-    const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+  /* ===== Odds sheet columns ===== */
+  const COLS = {
+    date: "Date",
+    time: "Time",
+    channel: "Channel",
+    away: "Away",
+    aSu: "A SU Line",
+    aSpread: "A Spread",
+    aSpreadLine: "A Spread Line",
+    home: "Home",
+    hSu: "H SU Line",
+    hSpread: "H Spread",
+    hSpreadLine: "H Spread Line",
+    ouTotal: "Over/Under",
+    oLine: "O Line",
+    uLine: "U Line"
+  };
 
-    // Published CSV (read-only) – kept for reference
-    const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+  let players = [];
+  let currentPlayer = null;
 
-    // Apps Script web-app URL that appends to the sheet
-    const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
+  /* ===== Helpers ===== */
+  const $ = sel => document.querySelector(sel);
+  const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
+  const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
+  const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
-    /* ===== Odds sheet columns ===== */
-    const COLS = {
-      date: "Date",
-      time: "Time",
-      channel: "Channel",
-      away: "Away",
-      aSu: "A SU Line",
-      aSpread: "A Spread",
-      aSpreadLine: "A Spread Line",
-      home: "Home",
-      hSu: "H SU Line",
-      hSpread: "H Spread",
-      hSpreadLine: "H Spread Line",
-      ouTotal: "Over/Under",
-      oLine: "O Line",
-      uLine: "U Line"
-    };
+  function computePayout(wager, odds){
+    const w = Number(wager||0), o = Number(odds);
+    if(!w || !o) return 0;
+    if(o < 0) return w + (w/Math.abs(o))*100;
+    return w + (w/100)*o;
+  }
 
-    let players = [];
-    let currentPlayer = null;
+  function sumCommitted(){
+    let total = 0;
+    document.querySelectorAll("input.wager").forEach(inp => { total += Number(inp.value||0); });
+    return total;
+  }
 
-    /* ===== Helpers ===== */
-    const $ = sel => document.querySelector(sel);
-    const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
-    const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
-    const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
+  function refreshHeaderTotals(){
+    const committed = sumCommitted();
+    const begin = Number(currentPlayer?.begin || 0);
+    const remaining = Math.max(0, begin - committed);
+    $("#hdrCommitted").textContent = fmtMoney(committed);
+    $("#hdrRemain").textContent    = fmtMoney(remaining);
+    $("#hdrBegin").textContent     = fmtMoney(begin);
+    $("#hdrEmail").textContent     = currentPlayer?.email || "—";
+  }
 
-    function computePayout(wager, odds){
-      const w = Number(wager||0), o = Number(odds);
-      if(!w || !o) return 0;
-      if(o < 0) return w + (w/Math.abs(o))*100;
-      return w + (w/100)*o;
-    }
+  /* ===== Pill & Row logic ===== */
+  function pill(label, odds, gameId, group){
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "pill";
+    el.dataset.gameId = gameId;
+    el.dataset.group  = group;   // ml | spread | total
+    el.dataset.odds   = odds ?? "";
+    el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
 
-    function sumCommitted(){
-      let total = 0;
-      document.querySelectorAll("input.wager").forEach(inp => { total += Number(inp.value||0); });
-      return total;
-    }
+    el.addEventListener("click", () => {
+      const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
+      const wasActive = el.classList.contains("active");
 
-    function refreshHeaderTotals(){
-      const committed = sumCommitted();
-      const begin = Number(currentPlayer?.begin || 0);
-      const remaining = Math.max(0, begin - committed);
-      $("#hdrCommitted").textContent = fmtMoney(committed);
-      $("#hdrRemain").textContent    = fmtMoney(remaining);
-      $("#hdrBegin").textContent     = fmtMoney(begin);
-      $("#hdrEmail").textContent     = currentPlayer?.email || "—";
-    }
-
-    /* ===== Pill & Row logic ===== */
-    function pill(label, odds, gameId, group){
-      const el = document.createElement("button");
-      el.type = "button";
-      el.className = "pill";
-      el.dataset.gameId = gameId;
-      el.dataset.group  = group;   // ml | spread | total
-      el.dataset.odds   = odds ?? "";
-      el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
-
-      el.addEventListener("click", () => {
-        const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
-        const wasActive = el.classList.contains("active");
-
-        // Toggle: if already active, unselect; else select and clear other in row
-        if (wasActive) {
-          el.classList.remove("active");
-        } else {
-          scope.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));
-          el.classList.add("active");
-        }
-        updateRow(scope);
-        refreshHeaderTotals();
-      });
-
-      return el;
-    }
-
-    function updateRow(scope){
-      const wagerInput = scope.querySelector("input.wager");
-      const payoutEl   = scope.querySelector(".payout");
-      const warnEl     = scope.nextElementSibling?.classList.contains("warn") ? scope.nextElementSibling : null;
-
-      const begin = Number(currentPlayer?.begin || 0);
-      const before = Number(wagerInput.value || 0);
-
-      const totalNow = sumCommitted();
-      const over = Math.max(0, totalNow - begin);
-      if (over > 0) {
-        const newVal = Math.max(0, before - over);
-        wagerInput.value = Math.floor(newVal).toString();
-        if (warnEl) warnEl.textContent = newVal === 0 ? "Budget reached." : `Capped to remaining.`;
-      } else if (warnEl) {
-        warnEl.textContent = "";
+      // Toggle: if already active, unselect; else select and clear other in row
+      if (wasActive) {
+        el.classList.remove("active");
+      } else {
+        scope.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));
+        el.classList.add("active");
       }
-
-      const active = scope.querySelector(".pill.active");
-      const wager  = Number(wagerInput.value||0);
-
-      if(!active || !wager){
-        payoutEl.textContent = "—";
-        refreshHeaderTotals();
-        return;
-      }
-
-      const odds = Number(active.dataset.odds);
-      const total = computePayout(wager, odds);
-      payoutEl.textContent = isFinite(total) ? fmtMoney(total) : "—";
-
+      updateRow(scope);
       refreshHeaderTotals();
+    });
+
+    return el;
+  }
+
+  function updateRow(scope){
+    const wagerInput = scope.querySelector("input.wager");
+    const payoutEl   = scope.querySelector(".payout");
+    const warnEl     = scope.nextElementSibling?.classList.contains("warn") ? scope.nextElementSibling : null;
+
+    const begin = Number(currentPlayer?.begin || 0);
+    const before = Number(wagerInput.value || 0);
+
+    const totalNow = sumCommitted();
+    const over = Math.max(0, totalNow - begin);
+    if (over > 0) {
+      const newVal = Math.max(0, before - over);
+      wagerInput.value = Math.floor(newVal).toString();
+      if (warnEl) warnEl.textContent = newVal === 0 ? "Budget reached." : `Capped to remaining.`;
+    } else if (warnEl) {
+      warnEl.textContent = "";
     }
 
-    function buildRow(idx, group, label, pillLeft, pillRight){
-      const lab = document.createElement("div");
-      lab.className = "rowlabel";
-      lab.textContent = label;
+    const active = scope.querySelector(".pill.active");
+    const wager  = Number(wagerInput.value||0);
 
-      const r = document.createElement("div");
-      r.className = "row";
-      r.dataset.group = group;
-
-      r.append(pillLeft, pillRight);
-
-      const wagerWrap = document.createElement("div");
-      wagerWrap.className = "money";
-      const wagerInput = document.createElement("input");
-      wagerInput.type = "number";
-      wagerInput.min = "0";
-      wagerInput.step = "1";
-      wagerInput.placeholder = "Wager";
-      wagerInput.className = "wager";
-      wagerInput.addEventListener("input", () => {
-        updateRow(r);
-      });
-      wagerWrap.append(wagerInput);
-
-      const payout = document.createElement("div");
-      payout.className = "payout";
-      payout.textContent = "—";
-
-      r.append(wagerWrap, payout);
-
-      const warn = document.createElement("div");
-      warn.className = "warn";
-      warn.textContent = "";
-
-      const frag = document.createDocumentFragment();
-      frag.append(lab, r, warn);
-      return frag;
-    }
-
-    function buildGameRow(row, idx){
-      const game = document.createElement("section");
-      game.className = "game";
-      game.dataset.id = idx;
-
-      const head = document.createElement("div");
-      head.className = "head";
-      const teams = document.createElement("div");
-      teams.className = "teams";
-      teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
-      const when = document.createElement("div");
-      when.className = "when";
-      when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
-      head.append(teams, when);
-      game.appendChild(head);
-
-      // Moneyline
-      game.appendChild(buildRow(
-        idx, "ml", "Moneyline",
-        pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
-        pill(row[COLS.home], row[COLS.hSu], idx, "ml")
-      ));
-
-      // Spread
-      game.appendChild(buildRow(
-        idx, "spread", "Spread",
-        pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
-        pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
-      ));
-
-      // Total
-      game.appendChild(buildRow(
-        idx, "total", "Total (O/U)",
-        pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
-        pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")
-      ));
-
-      return game;
-    }
-
-    function renderGames(rows){
-      const container = document.getElementById("games");
-      container.innerHTML = "";
-      rows.forEach((r,i)=>{
-        if(!(r[COLS.away] && r[COLS.home])) return;
-        container.appendChild(buildGameRow(r,i));
-      });
+    if(!active || !wager){
+      payoutEl.textContent = "—";
       refreshHeaderTotals();
+      return;
     }
 
-    /* ===== Collect picks for submit ===== */
-    function collectPicks(){
-      const picks = [];
-      if (!currentPlayer) {
-        alert("Please select your name at the top first.");
-        return picks;
-      }
-      document.querySelectorAll(".game").forEach(game => {
-        ["ml","spread","total"].forEach(group => {
-          const row = game.querySelector(`.row[data-group="${group}"]`);
-          if (!row) return;
-          const active = row.querySelector(".pill.active");
-          const wager = Number(row.querySelector("input.wager").value || 0);
-          if (active && wager > 0){
-            const pickLabel = active.querySelector(".name").textContent.trim();
-            picks.push({
-              Week: WEEK_LABEL,
-              Name: currentPlayer.name,
-              Pick: pickLabel,
-              Wager: wager
-            });
-          }
-        });
-      });
+    const odds = Number(active.dataset.odds);
+    const total = computePayout(wager, odds);
+    payoutEl.textContent = isFinite(total) ? fmtMoney(total) : "—";
+
+    refreshHeaderTotals();
+  }
+
+  function buildRow(idx, group, label, pillLeft, pillRight){
+    const lab = document.createElement("div");
+    lab.className = "rowlabel";
+    lab.textContent = label;
+
+    const r = document.createElement("div");
+    r.className = "row";
+    r.dataset.group = group;
+
+    r.append(pillLeft, pillRight);
+
+    const wagerWrap = document.createElement("div");
+    wagerWrap.className = "money";
+    const wagerInput = document.createElement("input");
+    wagerInput.type = "number";
+    wagerInput.min = "0";
+    wagerInput.step = "1";
+    wagerInput.placeholder = "Wager";
+    wagerInput.className = "wager";
+    wagerInput.addEventListener("input", () => {
+      updateRow(r);
+    });
+    wagerWrap.append(wagerInput);
+
+    const payout = document.createElement("div");
+    payout.className = "payout";
+    payout.textContent = "—";
+
+    r.append(wagerWrap, payout);
+
+    const warn = document.createElement("div");
+    warn.className = "warn";
+    warn.textContent = "";
+
+    const frag = document.createDocumentFragment();
+    frag.append(lab, r, warn);
+    return frag;
+  }
+
+  function buildGameRow(row, idx){
+    const game = document.createElement("section");
+    game.className = "game";
+    game.dataset.id = idx;
+
+    const head = document.createElement("div");
+    head.className = "head";
+    const teams = document.createElement("div");
+    teams.className = "teams";
+    teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    const when = document.createElement("div");
+    when.className = "when";
+    when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
+    head.append(teams, when);
+    game.appendChild(head);
+
+    // Moneyline
+    game.appendChild(buildRow(
+      idx, "ml", "Moneyline",
+      pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
+      pill(row[COLS.home], row[COLS.hSu], idx, "ml")
+    ));
+
+    // Spread
+    game.appendChild(buildRow(
+      idx, "spread", "Spread",
+      pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
+      pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
+    ));
+
+    // Total
+    game.appendChild(buildRow(
+      idx, "total", "Total (O/U)",
+      pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
+      pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")
+    ));
+
+    return game;
+  }
+
+  function renderGames(rows){
+    const container = document.getElementById("games");
+    container.innerHTML = "";
+    rows.forEach((r,i)=>{
+      if(!(r[COLS.away] && r[COLS.home])) return;
+      container.appendChild(buildGameRow(r,i));
+    });
+    refreshHeaderTotals();
+  }
+
+  /* ===== Collect picks for submit ===== */
+  function collectPicks(){
+    const picks = [];
+    if (!currentPlayer) {
+      alert("Please select your name at the top first.");
       return picks;
     }
-
-    async function submitPicks(){
-      const statusEl  = $("#submitStatus");
-      const btn       = $("#submitBtn");
-      const spinner   = $("#submitSpinner");
-
-      statusEl.textContent = "";
-
-      const picks = collectPicks();
-      if (!picks.length){
-        return; // collectPicks already alerted
-      }
-
-      if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
-        console.log("Picks that would be submitted to the sheet:", picks);
-        alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
-        return;
-      }
-
-      // UI: show spinner / disable button
-      btn.disabled = true;
-      btn.textContent = "Submitting…";
-      if (spinner) spinner.style.display = "inline-block";
-
-      try{
-        const params = new URLSearchParams();
-        params.append("data", JSON.stringify({
-          rows: picks,
-          week: WEEK_LABEL,
-          targetCsv: PICKS_SHEET_CSV_URL
-        }));
-
-        const resp = await fetch(SUBMIT_ENDPOINT, {
-          method: "POST",
-          body: params
-        });
-
-        const text = await resp.text();
-        console.log("Submit response:", text);
-        statusEl.textContent = "Picks submitted!";
-        alert("Your picks for " + WEEK_LABEL + " have been submitted.");
-      }catch(err){
-        console.error(err);
-        statusEl.textContent = "Error submitting picks. Check console for details.";
-        alert("There was an error submitting your picks. Please try again.");
-      }finally{
-        btn.disabled = false;
-        btn.textContent = "Submit Picks";
-        if (spinner) spinner.style.display = "none";
-      }
-    }
-
-    /* ===== Data loading ===== */
-    function loadPlayers(){
-      return new Promise(resolve=>{
-        Papa.parse(PLAYERS_CSV_URL,{
-          download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
-          complete:res=>{
-            players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
-              name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Wild Card"])
-            }));
-            const sel=$("#playerSelect");
-            sel.innerHTML=`<option value="">-- Select --</option>`+
-              players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
-            sel.addEventListener("change",()=>{
-              currentPlayer=players[sel.value]??null;
-              refreshHeaderTotals();
-            });
-            resolve();
-          }});
+    document.querySelectorAll(".game").forEach(game => {
+      ["ml","spread","total"].forEach(group => {
+        const row = game.querySelector(`.row[data-group="${group}"]`);
+        if (!row) return;
+        const active = row.querySelector(".pill.active");
+        const wager = Number(row.querySelector("input.wager").value || 0);
+        if (active && wager > 0){
+          const pickLabel = active.querySelector(".name").textContent.trim();
+          picks.push({
+            Week: WEEK_LABEL,
+            Name: currentPlayer.name,
+            Pick: pickLabel,
+            Wager: wager
+          });
+        }
       });
+    });
+    return picks;
+  }
+
+  async function submitPicks(){
+    const statusEl  = $("#submitStatus");
+    const btn       = $("#submitBtn");
+    const spinner   = $("#submitSpinner");
+
+    statusEl.textContent = "";
+
+    const picks = collectPicks();
+    if (!picks.length){
+      return; // collectPicks already alerted
     }
 
-    function loadOdds(){
-      return new Promise(resolve=>{
-        Papa.parse(ODDS_CSV_URL,{
-          download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
-          complete:res=>{renderGames(res.data||[]);resolve();}
-        });
+    if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
+      console.log("Picks that would be submitted to the sheet:", picks);
+      alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
+      return;
+    }
+
+    // UI: show spinner / disable button
+    btn.disabled = true;
+    btn.textContent = "Submitting…";
+    if (spinner) spinner.style.display = "inline-block";
+
+    try{
+      const params = new URLSearchParams();
+      params.append("data", JSON.stringify({
+        rows: picks,
+        week: WEEK_LABEL,
+        targetCsv: PICKS_SHEET_CSV_URL
+      }));
+
+      const resp = await fetch(SUBMIT_ENDPOINT, {
+        method: "POST",
+        body: params
       });
+
+      const text = await resp.text();
+      console.log("Submit response:", text);
+      statusEl.textContent = "Picks submitted!";
+      alert("Your picks for " + WEEK_LABEL + " have been submitted.");
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = "Error submitting picks. Check console for details.";
+      alert("There was an error submitting your picks. Please try again.");
+    }finally{
+      btn.disabled = false;
+      btn.textContent = "Submit Picks";
+      if (spinner) spinner.style.display = "none";
     }
+  }
 
-    (async function init(){
-      // Apply WEEK_LABEL to header & page title
-      const brandEl = document.querySelector(".brand");
-      if (brandEl){
-        brandEl.innerHTML = WEEK_LABEL + " Lines • <em>Pick’em</em>";
+  /* ===== Data loading ===== */
+  function loadPlayers(){
+    return new Promise(resolve=>{
+      Papa.parse(PLAYERS_CSV_URL,{
+        download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+        complete:res=>{
+          players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
+            name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Wild Card"])
+          }));
+          const sel=$("#playerSelect");
+          sel.innerHTML=`<option value="">-- Select --</option>`+
+            players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
+          sel.addEventListener("change",()=>{
+            currentPlayer=players[sel.value]??null;
+            refreshHeaderTotals();
+          });
+          resolve();
+        }});
+    });
+  }
+
+  function loadOdds(){
+    return new Promise(resolve=>{
+      Papa.parse(ODDS_CSV_URL,{
+        download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
+        complete:res=>{renderGames(res.data||[]);resolve();}
+      });
+    });
+  }
+
+  async function initApp(){
+    // Apply WEEK_LABEL to header & page title
+    const brandEl = document.querySelector(".brand");
+    if (brandEl){
+      brandEl.innerHTML = WEEK_LABEL + " Lines • <em>Pick’em</em>";
+    }
+    document.title = WEEK_LABEL + " Lines";
+
+    await Promise.all([loadPlayers(),loadOdds()]);
+
+    const submitBtn = $("#submitBtn");
+    if (submitBtn) submitBtn.addEventListener("click", submitPicks);
+  }
+
+  function setupGate(){
+    const soon = document.getElementById("comingSoon");
+    const app  = document.getElementById("mainApp");
+    const now  = new Date();
+
+    if (now >= GO_LIVE){
+      soon.style.display = "none";
+      app.style.display  = "block";
+      initApp();
+    }else{
+      // show coming soon, hide app
+      soon.style.display = "flex";
+      app.style.display  = "none";
+
+      const diff = GO_LIVE - now;
+      if (diff > 0 && diff < 2147483647){ // guard huge values
+        setTimeout(setupGate, diff);
       }
-      document.title = WEEK_LABEL + " Lines";
+    }
+  }
 
-      await Promise.all([loadPlayers(),loadOdds()]);
-
-      const submitBtn = $("#submitBtn");
-      if (submitBtn) submitBtn.addEventListener("click", submitPicks);
-    })();
-  </script>
+  document.addEventListener("DOMContentLoaded", setupGate);
+</script>
 </body>
 </html>
