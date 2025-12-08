@@ -16,12 +16,16 @@
     --text:#eef3ff;
   }
 
-  html,body{margin:0;background:var(--navy);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;}
+  html,body{
+    margin:0;
+    background:var(--navy);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+  }
   .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
 
   /* ===== Coming soon screen ===== */
   #comingSoon{
-    display:none;
     min-height:100vh;
     box-sizing:border-box;
     padding:40px 20px;
@@ -31,11 +35,101 @@
     text-align:center;
   }
   #comingSoon .csBox{
-    max-width:480px;
+    max-width:520px;
     margin:auto;
   }
-  #comingSoon h1{margin-bottom:10px;}
-  #comingSoon p{color:var(--muted);font-size:0.95rem;}
+  #comingSoon h1{margin:16px 0 8px;}
+  #comingSoon p{color:var(--muted);font-size:0.95rem;margin:4px 0;}
+
+  /* Football graphic */
+  .footballGraphic{
+    width:140px;
+    height:80px;
+    margin:0 auto 12px;
+    position:relative;
+    background:radial-gradient(circle at 30% 30%, #ffb38a 0, #ffb38a 40%, #c65322 100%);
+    border-radius:999px;
+    box-shadow:0 0 25px rgba(0,0,0,0.35);
+    transform:rotate(-12deg);
+  }
+  .footballGraphic::before,
+  .footballGraphic::after{
+    content:"";
+    position:absolute;
+    top:50%;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    border:3px solid #f8d9c4;
+    border-color:#f8d9c4 transparent;
+  }
+  .footballGraphic::before{
+    left:-6px;
+    transform:translateY(-50%) rotate(20deg);
+  }
+  .footballGraphic::after{
+    right:-6px;
+    transform:translateY(-50%) rotate(-20deg);
+  }
+  .laces{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%) rotate(12deg);
+    width:70px;
+    height:18px;
+  }
+  .laces-main{
+    position:absolute;
+    top:50%;
+    left:0;
+    right:0;
+    height:3px;
+    background:#fdf6ee;
+    transform:translateY(-50%);
+  }
+  .laces-main span{
+    position:absolute;
+    top:50%;
+    width:2px;
+    height:11px;
+    background:#fdf6ee;
+    transform:translateY(-50%);
+  }
+  .laces-main span:nth-child(1){left:15%;}
+  .laces-main span:nth-child(2){left:35%;}
+  .laces-main span:nth-child(3){left:55%;}
+  .laces-main span:nth-child(4){left:75%;}
+
+  /* Countdown */
+  #countdown{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:12px 0 6px;
+    flex-wrap:wrap;
+  }
+  .timeBox{
+    min-width:70px;
+    padding:8px 10px;
+    border-radius:10px;
+    background:var(--navy-2);
+    border:1px solid var(--border);
+  }
+  .timeBox span{
+    display:block;
+    font-size:1.4rem;
+    font-weight:700;
+  }
+  .timeBox label{
+    display:block;
+    font-size:.7rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .csSub{font-size:.85rem;color:var(--muted);}
 
   /* ===== Sticky header ===== */
   .topbar{
@@ -145,8 +239,38 @@
 <!-- Coming soon gate -->
 <div id="comingSoon">
   <div class="csBox">
+    <div class="footballGraphic">
+      <div class="laces">
+        <div class="laces-main">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
     <h1>Wild Card Lines</h1>
-    <p>The Wild Card picks page will open soon. Check back at kickoff time!</p>
+    <p>Get ready to make your picks! The page will unlock at kickoff.</p>
+
+    <div id="countdown">
+      <div class="timeBox">
+        <span id="cdDays">00</span>
+        <label>Days</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdHours">00</span>
+        <label>Hours</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdMins">00</span>
+        <label>Minutes</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdSecs">00</span>
+        <label>Seconds</label>
+      </div>
+    </div>
+
+    <p class="csSub">
+      Unlocks at <span id="goLiveText"></span> (Eastern).
+    </p>
   </div>
 </div>
 
@@ -191,7 +315,7 @@
 
   // Go-live time in Eastern. Use -05:00 for EST, -04:00 for EDT.
   // Example: Jan 10, 2025 at 6:00 PM Eastern Standard Time
-  const GO_LIVE_ISO = "2026-01-10T18:00:00-05:00";
+  const GO_LIVE_ISO = "2025-01-10T18:00:00-05:00";
   const GO_LIVE = new Date(GO_LIVE_ISO);
 
   const WEEK_LABEL = "Wild Card"; // header + Week column
@@ -225,6 +349,7 @@
 
   let players = [];
   let currentPlayer = null;
+  let countdownTimer = null;
 
   /* ===== Helpers ===== */
   const $ = sel => document.querySelector(sel);
@@ -269,7 +394,6 @@
       const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
       const wasActive = el.classList.contains("active");
 
-      // Toggle: if already active, unselect; else select and clear other in row
       if (wasActive) {
         el.classList.remove("active");
       } else {
@@ -372,21 +496,18 @@
     head.append(teams, when);
     game.appendChild(head);
 
-    // Moneyline
     game.appendChild(buildRow(
       idx, "ml", "Moneyline",
       pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
       pill(row[COLS.home], row[COLS.hSu], idx, "ml")
     ));
 
-    // Spread
     game.appendChild(buildRow(
       idx, "spread", "Spread",
       pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
       pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
     ));
 
-    // Total
     game.appendChild(buildRow(
       idx, "total", "Total (O/U)",
       pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
@@ -442,7 +563,7 @@
 
     const picks = collectPicks();
     if (!picks.length){
-      return; // collectPicks already alerted
+      return;
     }
 
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
@@ -451,7 +572,6 @@
       return;
     }
 
-    // UI: show spinner / disable button
     btn.disabled = true;
     btn.textContent = "Submitting…";
     if (spinner) spinner.style.display = "inline-block";
@@ -515,7 +635,6 @@
   }
 
   async function initApp(){
-    // Apply WEEK_LABEL to header & page title
     const brandEl = document.querySelector(".brand");
     if (brandEl){
       brandEl.innerHTML = WEEK_LABEL + " Lines • <em>Pick’em</em>";
@@ -528,25 +647,72 @@
     if (submitBtn) submitBtn.addEventListener("click", submitPicks);
   }
 
+  function showApp(){
+    const soon = document.getElementById("comingSoon");
+    const app  = document.getElementById("mainApp");
+    soon.style.display = "none";
+    app.style.display  = "block";
+    if (countdownTimer) clearInterval(countdownTimer);
+    initApp();
+  }
+
+  function updateCountdown(){
+    const now = new Date();
+    const diff = GO_LIVE - now;
+
+    if (diff <= 0){
+      showApp();
+      return;
+    }
+
+    const totalSeconds = Math.floor(diff / 1000);
+    const days  = Math.floor(totalSeconds / (24*3600));
+    const hours = Math.floor((totalSeconds % (24*3600)) / 3600);
+    const mins  = Math.floor((totalSeconds % 3600) / 60);
+    const secs  = totalSeconds % 60;
+
+    $("#cdDays").textContent  = String(days).padStart(2,"0");
+    $("#cdHours").textContent = String(hours).padStart(2,"0");
+    $("#cdMins").textContent  = String(mins).padStart(2,"0");
+    $("#cdSecs").textContent  = String(secs).padStart(2,"0");
+  }
+
   function setupGate(){
     const soon = document.getElementById("comingSoon");
     const app  = document.getElementById("mainApp");
-    const now  = new Date();
 
+    // Show go-live text in Eastern time
+    const goLiveTextEl = document.getElementById("goLiveText");
+    if (goLiveTextEl && typeof Intl !== "undefined"){
+      try{
+        goLiveTextEl.textContent = GO_LIVE.toLocaleString("en-US",{
+          timeZone:"America/New_York",
+          weekday:"short",
+          month:"short",
+          day:"numeric",
+          hour:"numeric",
+          minute:"2-digit"
+        });
+      }catch(e){
+        goLiveTextEl.textContent = GO_LIVE.toLocaleString();
+      }
+    }else if (goLiveTextEl){
+      goLiveTextEl.textContent = GO_LIVE.toLocaleString();
+    }
+
+    const now = new Date();
     if (now >= GO_LIVE){
       soon.style.display = "none";
       app.style.display  = "block";
       initApp();
-    }else{
-      // show coming soon, hide app
-      soon.style.display = "flex";
-      app.style.display  = "none";
-
-      const diff = GO_LIVE - now;
-      if (diff > 0 && diff < 2147483647){ // guard huge values
-        setTimeout(setupGate, diff);
-      }
+      return;
     }
+
+    // Show countdown screen
+    soon.style.display = "flex";
+    app.style.display  = "none";
+    updateCountdown();
+    countdownTimer = setInterval(updateCountdown, 1000);
   }
 
   document.addEventListener("DOMContentLoaded", setupGate);
