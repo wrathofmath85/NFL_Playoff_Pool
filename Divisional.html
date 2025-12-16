@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wild Card Lines</title>
+<style>
+  /* ===== Chicago Bears palette ===== */
+  :root{
+    --navy:#0B162A;
+    --navy-2:#101b33;
+    --navy-3:#0e1424;
+    --orange:#DC4405;
+    --muted:#a9b5c7;
+    --border:#27385e;
+    --text:#eef3ff;
+  }
+
+  html,body{
+    margin:0;
+    background:var(--navy);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+  }
+  .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
+
+  /* ===== Coming soon screen ===== */
+  #comingSoon{
+    min-height:100vh;
+    box-sizing:border-box;
+    padding:40px 20px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+  }
+  #comingSoon .csBox{max-width:520px;margin:auto;}
+  #comingSoon h1{margin:16px 0 8px;}
+  #comingSoon p{color:var(--muted);font-size:0.95rem;margin:4px 0;}
+
+  /* Football graphic */
+  .footballGraphic{
+    width:140px;height:80px;margin:0 auto 12px;position:relative;
+    background:radial-gradient(circle at 30% 30%, #ffb38a 0, #ffb38a 40%, #c65322 100%);
+    border-radius:999px;box-shadow:0 0 25px rgba(0,0,0,0.35);transform:rotate(-12deg);
+  }
+  .footballGraphic::before,.footballGraphic::after{
+    content:"";position:absolute;top:50%;width:18px;height:18px;border-radius:50%;
+    border:3px solid #f8d9c4;border-color:#f8d9c4 transparent;
+  }
+  .footballGraphic::before{left:-6px;transform:translateY(-50%) rotate(20deg);}
+  .footballGraphic::after{right:-6px;transform:translateY(-50%) rotate(-20deg);}
+  .laces{position:absolute;top:50%;left:50%;transform:translate(-50%, -50%) rotate(12deg);width:70px;height:18px;}
+  .laces-main{position:absolute;top:50%;left:0;right:0;height:3px;background:#fdf6ee;transform:translateY(-50%);}
+  .laces-main span{position:absolute;top:50%;width:2px;height:11px;background:#fdf6ee;transform:translateY(-50%);}
+  .laces-main span:nth-child(1){left:15%;}
+  .laces-main span:nth-child(2){left:35%;}
+  .laces-main span:nth-child(3){left:55%;}
+  .laces-main span:nth-child(4){left:75%;}
+
+  /* Coming Soon badge */
+  .csBadge{
+    display:inline-block;padding:10px 14px;border:1px solid var(--border);border-radius:999px;
+    background:var(--navy-2);font-weight:800;color:var(--orange);margin-top:8px;
+  }
+  .csSub{font-size:.85rem;color:var(--muted);margin-top:8px}
+
+  /* ===== Sticky header ===== */
+  .topbar{
+    position:sticky;top:0;z-index:50;backdrop-filter:saturate(130%) blur(4px);
+    background:color-mix(in srgb, var(--navy) 85%, black 15%);border-bottom:2px solid var(--orange);
+  }
+  .topbar .inner{
+    max-width:1100px;margin:auto;padding:10px 22px;display:grid;gap:10px;
+    grid-template-columns:1fr repeat(3,minmax(140px,auto));align-items:end
+  }
+  .brand{font-weight:800;letter-spacing:.3px}
+  .brand em{color:var(--orange);font-style:normal}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.78rem;color:var(--muted)}
+  select,input.read{
+    appearance:none;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
+    background:var(--navy-2);color:var(--text);padding:10px 12px;font-size:15px;outline:none;
+  }
+  .totals{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
+  .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
+  .chip strong{color:var(--orange)}
+  @media (max-width:860px){
+    .topbar .inner{grid-template-columns:1fr}
+    .field{max-width:100%}
+    .totals{justify-content:flex-start}
+  }
+
+  /* ===== Games ===== */
+  h1{margin:14px 0 8px}
+  .hint{color:var(--muted);margin:0 0 12px}
+  .game{background:var(--navy-3);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px 0}
+  .head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:0 4px 10px;margin-bottom:8px}
+  .when{color:var(--muted);font-size:.92rem}
+  .teams{font-weight:700;color:var(--orange)}
+  .rowlabel{grid-column:1/-1;color:var(--muted);font-size:.84rem;margin-top:6px}
+  .row{display:grid;grid-template-columns:1fr 1fr 120px 140px;gap:8px;align-items:stretch;margin:8px 0}
+  @media (max-width:780px){.row{grid-template-columns:1fr}}
+
+  .pill{
+    border:1px solid var(--border);background:var(--navy-2);border-radius:10px;padding:10px;cursor:pointer;
+    display:flex;justify-content:space-between;gap:8px;color:var(--orange);font-weight:600;
+    transition:background .15s,box-shadow .15s,color .15s;
+  }
+  .pill:hover{background:#16264a;color:#ff6a1a}
+  .pill.active{box-shadow:0 0 0 2px var(--orange) inset;background:#1c2946;color:#fff;}
+  .pill .odds{opacity:.9}
+
+  .money input{
+    width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
+    background:var(--navy-2);color:var(--text);font-size:16px;padding:10px 12px;outline:none;
+  }
+  .payout{
+    background:var(--navy-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:var(--orange)
+  }
+  .warn{color:#ffd18c;font-size:.85rem;margin-top:2px}
+  footer{color:var(--muted);font-size:.85rem;margin-top:18px}
+
+  /* submit button in header */
+  .submitBtn{
+    padding:8px 18px;border-radius:999px;border:1px solid var(--orange);background:var(--orange);
+    color:#fff;font-weight:700;cursor:pointer;font-size:.9rem;
+  }
+  .submitBtn[disabled]{opacity:.6;cursor:default}
+  .submitBtn:hover:not([disabled]){background:#ff6a1a}
+
+  /* spinner */
+  .spinner{
+    width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;animation:spin .7s linear infinite;display:none;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* locked banner */
+  .lockBanner{
+    margin:10px 0 0;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    background:color-mix(in srgb, var(--navy-2) 85%, black 15%);
+    border-left:4px solid #ffd18c;
+    border-radius:12px;
+    color:#ffd18c;
+    font-size:.92rem;
+    display:none;
+  }
+</style>
+</head>
+<body>
+
+<!-- Coming soon gate -->
+<div id="comingSoon">
+  <div class="csBox">
+    <div class="footballGraphic">
+      <div class="laces">
+        <div class="laces-main">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+    <h1>Wild Card Lines</h1>
+    <span class="csBadge">Coming Soon</span>
+    <p class="csSub">Lines will be posted here. Check back shortly.</p>
+  </div>
+</div>
+
+<!-- Main app (hidden until live) -->
+<div id="mainApp" style="display:none;">
+  <!-- ===== Sticky header ===== -->
+  <header class="topbar">
+    <div class="inner">
+      <div class="field" style="grid-column:1 / -1">
+        <div class="brand">Wild Card Lines • <em>Pick’em</em></div>
+        <div class="totals">
+          <span class="chip">Email: <strong id="hdrEmail">—</strong></span>
+          <span class="chip">Begin: <strong id="hdrBegin">$0.00</strong></span>
+          <span class="chip">Remaining: <strong id="hdrRemain">$0.00</strong></span>
+          <span class="chip">Committed: <strong id="hdrCommitted">$0.00</strong></span>
+          <button id="submitBtn" class="submitBtn">Submit Picks</button>
+          <div id="submitSpinner" class="spinner" aria-hidden="true"></div>
+        </div>
+        <div id="lockBanner" class="lockBanner"></div>
+      </div>
+      <div class="field" style="grid-column:1 / -1">
+        <label for="playerSelect">Select your name</label>
+        <select id="playerSelect"><option>Loading players…</option></select>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <h1>Games</h1>
+    <p class="hint">Each game has <b>Moneyline</b>, <b>Spread</b>, and <b>Total (O/U)</b> rows. Click a pill, type a wager, and we’ll compute <em>To Win</em> for that row. Your <b>Remaining</b> budget updates automatically and wagers are capped to your Begin amount.</p>
+
+    <div id="games"></div>
+
+    <div id="submitStatus" class="hint"></div>
+
+    <footer></footer>
+  </div>
+</div>
+
+<!-- PapaParse -->
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
+<script>
+  /* ===== Simple gate: set to "comingSoon" or "live" ===== */
+  const REVEAL_MODE = "comingSoon"; // change to "comingSoon" to hide the app
+
+  /* ===== Config / URLs ===== */
+  const WEEK_LABEL = "Wild Card"; // header + Week column
+
+  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
+  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+  // Published CSV (read-only) – this is what we ALSO read to block duplicates
+  const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+
+  // Apps Script web-app URL that appends to the sheet
+  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
+
+  /* ===== NEW: Deadline (Eastern Time) =====
+     Set this to the cutoff in America/New_York.
+     Format below: "YYYY-MM-DD HH:MM" (24-hour).
+     Example: "2025-12-20 18:00" = Dec 20, 2025 at 6:00 PM ET.
+  */
+  const PICKS_DEADLINE_ET = "2025-12-31 23:59";
+
+  /* ===== EmailJS: fill these in ===== */
+  const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
+  const EMAILJS_SERVICE_ID = "service_txqdfck";
+  const EMAILJS_TEMPLATE_ID = "template_7v0wu4t";
+
+  /* ===== Odds sheet columns ===== */
+  const COLS = {
+    date: "Date", time: "Time", channel: "Channel",
+    away: "Away", aSu: "A SU Line", aSpread: "A Spread", aSpreadLine: "A Spread Line",
+    home: "Home", hSu: "H SU Line", hSpread: "H Spread", hSpreadLine: "H Spread Line",
+    ouTotal: "Over/Under", oLine: "O Line", uLine: "U Line"
+  };
+
+  let players = [];
+  let currentPlayer = null;
+
+  // NEW: cache of existing picks rows (read from the same published CSV)
+  let existingPickRows = [];
+  let lockReason = ""; // "deadline" | "already_submitted" | ""
+
+  /* ===== Helpers ===== */
+  const $ = sel => document.querySelector(sel);
+  const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
+  const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
+  const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
+
+  function computePayout(wager, odds){
+    const w = Number(wager||0), o = Number(odds);
+    if(!w || !o) return 0;
+    if(o < 0) return w + (w/Math.abs(o))*100;
+    return w + (w/100)*o;
+  }
+
+  function sumCommitted(){
+    let total = 0;
+    document.querySelectorAll("input.wager").forEach(inp => { total += Number(inp.value||0); });
+    return total;
+  }
+
+  function refreshHeaderTotals(){
+    const committed = sumCommitted();
+    const begin = Number(currentPlayer?.begin || 0);
+    const remaining = Math.max(0, begin - committed);
+    $("#hdrCommitted").textContent = fmtMoney(committed);
+    $("#hdrRemain").textContent    = fmtMoney(remaining);
+    $("#hdrBegin").textContent     = fmtMoney(begin);
+    $("#hdrEmail").textContent     = currentPlayer?.email || "—";
+  }
+
+  /* ===== NEW: Timezone-safe(ish) ET deadline handling ===== */
+  function getZonedParts(date, timeZone){
+    const fmt = new Intl.DateTimeFormat("en-US",{
+      timeZone,
+      hour12:false,
+      year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit"
+    });
+    const parts = fmt.formatToParts(date);
+    const out = {};
+    for (const p of parts){
+      if (p.type !== "literal") out[p.type] = p.value;
+    }
+    return {
+      year: Number(out.year),
+      month: Number(out.month),
+      day: Number(out.day),
+      hour: Number(out.hour),
+      minute: Number(out.minute),
+      second: Number(out.second)
+    };
+  }
+
+  // Convert a desired local time in a named tz to a UTC Date (handles DST).
+  function zonedTimeToUtc({timeZone, year, month, day, hour, minute, second=0}){
+    // Start with a naive UTC guess, then compute the offset difference and correct.
+    const guess = new Date(Date.UTC(year, month-1, day, hour, minute, second));
+    const asZoned = getZonedParts(guess, timeZone);
+
+    const guessAsIfZoned = Date.UTC(asZoned.year, asZoned.month-1, asZoned.day, asZoned.hour, asZoned.minute, asZoned.second);
+    const desiredAsZoned = Date.UTC(year, month-1, day, hour, minute, second);
+
+    const diffMs = desiredAsZoned - guessAsIfZoned;
+    return new Date(guess.getTime() + diffMs);
+  }
+
+  function parseDeadlineETToUtcDate(deadlineStr){
+    // "YYYY-MM-DD HH:MM"
+    const m = String(deadlineStr||"").trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+    if(!m) return null;
+    const [,Y,Mo,D,H,Mi] = m;
+    return zonedTimeToUtc({
+      timeZone:"America/New_York",
+      year:Number(Y), month:Number(Mo), day:Number(D),
+      hour:Number(H), minute:Number(Mi), second:0
+    });
+  }
+
+  function isPastDeadline(){
+    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
+    if(!dl) return false; // if malformed, don't block
+    return Date.now() > dl.getTime();
+  }
+
+  function formatDeadlineForDisplay(){
+    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
+    if(!dl) return "";
+    // Display in ET for clarity
+    const fmt = new Intl.DateTimeFormat("en-US",{
+      timeZone:"America/New_York",
+      weekday:"short", month:"short", day:"2-digit", year:"numeric",
+      hour:"numeric", minute:"2-digit"
+    });
+    return fmt.format(dl) + " ET";
+  }
+
+  /* ===== NEW: UI lock/unlock ===== */
+  function setInputsEnabled(enabled){
+    // pills
+    document.querySelectorAll(".pill").forEach(b => b.disabled = !enabled);
+    // wagers
+    document.querySelectorAll("input.wager").forEach(i => i.disabled = !enabled);
+    // submit
+    const btn = $("#submitBtn");
+    if (btn) btn.disabled = !enabled;
+  }
+
+  function showLockBanner(msg){
+    const b = $("#lockBanner");
+    if(!b) return;
+    if(msg){
+      b.textContent = msg;
+      b.style.display = "block";
+    } else {
+      b.textContent = "";
+      b.style.display = "none";
+    }
+  }
+
+  function applyGlobalLocks(){
+    // Deadline lock takes precedence
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      setInputsEnabled(false);
+      showLockBanner(`Picks are CLOSED. Deadline was ${formatDeadlineForDisplay()}.`);
+      return;
+    }
+
+    // If player-specific lock says already submitted, keep locked.
+    if (lockReason === "already_submitted"){
+      setInputsEnabled(false);
+      showLockBanner(`Picks already submitted for ${currentPlayer?.name || "this player"} for ${WEEK_LABEL}.`);
+      return;
+    }
+
+    // Otherwise unlocked (once a player is chosen, we enable interaction)
+    lockReason = "";
+    // If no player selected, keep submit disabled but allow viewing
+    const hasPlayer = !!currentPlayer;
+    setInputsEnabled(hasPlayer);
+    showLockBanner(hasPlayer ? "" : `Select your name to enable picks. Deadline: ${formatDeadlineForDisplay() || "N/A"}.`);
+  }
+
+  /* ===== Pill & Row logic ===== */
+  function pill(label, odds, gameId, group){
+    const el = document.createElement("button");
+    el.type = "button";
+    el.className = "pill";
+    el.dataset.gameId = gameId;
+    el.dataset.group  = group;   // ml | spread | total
+    el.dataset.odds   = odds ?? "";
+    el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
+
+    el.addEventListener("click", () => {
+      if (el.disabled) return;
+
+      const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
+      const wasActive = el.classList.contains("active");
+
+      if (wasActive) {
+        el.classList.remove("active");
+      } else {
+        scope.querySelectorAll(".pill").forEach(p=>p.classList.remove("active"));
+        el.classList.add("active");
+      }
+      updateRow(scope);
+      refreshHeaderTotals();
+    });
+
+    return el;
+  }
+
+  function updateRow(scope){
+    const wagerInput = scope.querySelector("input.wager");
+    const payoutEl   = scope.querySelector(".payout");
+    const warnEl     = scope.nextElementSibling?.classList.contains("warn") ? scope.nextElementSibling : null;
+
+    const begin = Number(currentPlayer?.begin || 0);
+    const before = Number(wagerInput.value || 0);
+
+    const totalNow = sumCommitted();
+    const over = Math.max(0, totalNow - begin);
+    if (over > 0) {
+      const newVal = Math.max(0, before - over);
+      wagerInput.value = Math.floor(newVal).toString();
+      if (warnEl) warnEl.textContent = newVal === 0 ? "Budget reached." : `Capped to remaining.`;
+    } else if (warnEl) {
+      warnEl.textContent = "";
+    }
+
+    const active = scope.querySelector(".pill.active");
+    const wager  = Number(wagerInput.value||0);
+
+    if(!active || !wager){
+      payoutEl.textContent = "—";
+      refreshHeaderTotals();
+      return;
+    }
+
+    const odds = Number(active.dataset.odds);
+    const total = computePayout(wager, odds);
+    payoutEl.textContent = isFinite(total) ? fmtMoney(total) : "—";
+
+    refreshHeaderTotals();
+  }
+
+  function buildRow(idx, group, label, pillLeft, pillRight){
+    const lab = document.createElement("div");
+    lab.className = "rowlabel";
+    lab.textContent = label;
+
+    const r = document.createElement("div");
+    r.className = "row";
+    r.dataset.group = group;
+
+    r.append(pillLeft, pillRight);
+
+    const wagerWrap = document.createElement("div");
+    wagerWrap.className = "money";
+    const wagerInput = document.createElement("input");
+    wagerInput.type = "number";
+    wagerInput.min = "0";
+    wagerInput.step = "1";
+    wagerInput.placeholder = "Wager";
+    wagerInput.className = "wager";
+    wagerInput.addEventListener("input", () => {
+      if (wagerInput.disabled) return;
+      updateRow(r);
+    });
+    wagerWrap.append(wagerInput);
+
+    const payout = document.createElement("div");
+    payout.className = "payout";
+    payout.textContent = "—";
+
+    r.append(wagerWrap, payout);
+
+    const warn = document.createElement("div");
+    warn.className = "warn";
+    warn.textContent = "";
+
+    const frag = document.createDocumentFragment();
+    frag.append(lab, r, warn);
+    return frag;
+  }
+
+  function buildGameRow(row, idx){
+    const game = document.createElement("section");
+    game.className = "game";
+    game.dataset.id = idx;
+
+    const head = document.createElement("div");
+    head.className = "head";
+    const teams = document.createElement("div");
+    teams.className = "teams";
+    teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    const when = document.createElement("div");
+    when.className = "when";
+    when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
+    head.append(teams, when);
+    game.appendChild(head);
+
+    game.appendChild(buildRow(
+      idx, "ml", "Moneyline",
+      pill(row[COLS.away], row[COLS.aSu], idx, "ml"),
+      pill(row[COLS.home], row[COLS.hSu], idx, "ml")
+    ));
+
+    game.appendChild(buildRow(
+      idx, "spread", "Spread",
+      pill(`${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine], idx, "spread"),
+      pill(`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine], idx, "spread")
+    ));
+
+    game.appendChild(buildRow(
+      idx, "total", "Total (O/U)",
+      pill(`Over ${row[COLS.ouTotal]}`, row[COLS.oLine], idx, "total"),
+      pill(`Under ${row[COLS.ouTotal]}`, row[COLS.uLine], idx, "total")
+    ));
+
+    return game;
+  }
+
+  function renderGames(rows){
+    const container = document.getElementById("games");
+    container.innerHTML = "";
+    rows.forEach((r,i)=>{
+      if(!(r[COLS.away] && r[COLS.home])) return;
+      container.appendChild(buildGameRow(r,i));
+    });
+    refreshHeaderTotals();
+  }
+
+  /* ===== NEW: Load existing picks (for duplicate prevention) ===== */
+  function loadExistingPicks(){
+    return new Promise(resolve=>{
+      Papa.parse(PICKS_SHEET_CSV_URL,{
+        download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+        complete:res=>{
+          existingPickRows = (res.data||[]).filter(r => Object.keys(r||{}).length);
+          resolve();
+        },
+        error:err=>{
+          console.warn("Could not load existing picks CSV (duplicate checking will be skipped):", err);
+          existingPickRows = [];
+          resolve();
+        }
+      });
+    });
+  }
+
+  function playerHasExistingPicks(player){
+    if (!player) return false;
+
+    const name = String(player.name||"").trim().toLowerCase();
+    const email = String(player.email||"").trim().toLowerCase();
+
+    // We consider "already picked" if ANY row exists for this WEEK_LABEL and same Name (or Email)
+    // and it has a non-empty Pick or Wager.
+    return existingPickRows.some(r=>{
+      const wk = String(r["Week"]||r["WEEK"]||r["week"]||"").trim();
+      if (wk !== WEEK_LABEL) return false;
+
+      const rName  = String(r["Name"]||r["Player"]||"").trim().toLowerCase();
+      const rEmail = String(r["Email"]||"").trim().toLowerCase();
+      const rPick  = String(r["Pick"]||"").trim();
+      const rWager = String(r["Wager"]||"").trim();
+
+      const match = (rName && rName === name) || (email && rEmail && rEmail === email);
+      const hasContent = !!(rPick || rWager);
+      return match && hasContent;
+    });
+  }
+
+  function clearSelections(){
+    document.querySelectorAll(".pill.active").forEach(p=>p.classList.remove("active"));
+    document.querySelectorAll("input.wager").forEach(i=>i.value="");
+    document.querySelectorAll(".payout").forEach(p=>p.textContent="—");
+    document.querySelectorAll(".warn").forEach(w=>w.textContent="");
+    refreshHeaderTotals();
+  }
+
+  function onPlayerChanged(){
+    clearSelections();
+
+    // Deadline check first (global lock)
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      applyGlobalLocks();
+      return;
+    }
+
+    // Duplicate check (player-specific lock)
+    if (currentPlayer && playerHasExistingPicks(currentPlayer)){
+      lockReason = "already_submitted";
+      applyGlobalLocks();
+      return;
+    }
+
+    lockReason = "";
+    applyGlobalLocks();
+  }
+
+  /* ===== Collect picks for submit ===== */
+  function collectPicks(){
+    const picks = [];
+    if (!currentPlayer) {
+      alert("Please select your name at the top first.");
+      return picks;
+    }
+    document.querySelectorAll(".game").forEach(game => {
+      ["ml","spread","total"].forEach(group => {
+        const row = game.querySelector(`.row[data-group="${group}"]`);
+        if (!row) return;
+        const active = row.querySelector(".pill.active");
+        const wager = Number(row.querySelector("input.wager").value || 0);
+        if (active && wager > 0){
+          const pickLabel = active.querySelector(".name").textContent.trim();
+          picks.push({
+            Week: WEEK_LABEL,
+            Name: currentPlayer.name,
+            Email: currentPlayer.email || "",
+            Pick: pickLabel,
+            Wager: wager
+          });
+        }
+      });
+    });
+    return picks;
+  }
+
+  /* ===== Email building & sending ===== */
+  function picksToText(picks){
+    if (!picks.length) return "No picks.";
+    const lines = picks.map(p => `- ${p.Pick} — $${Number(p.Wager).toFixed(2)}`);
+    return lines.join("\n");
+  }
+  function picksToHTML(picks){
+    if (!picks.length) return "<p>No picks.</p>";
+    const rows = picks.map(p => `
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #ddd;">${p.Pick}</td>
+        <td style="padding:6px 10px;border:1px solid #ddd;text-align:right;">$${Number(p.Wager).toFixed(2)}</td>
+      </tr>`).join("");
+    return `
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;">
+        <thead>
+          <tr>
+            <th style="padding:8px 10px;border:1px solid #ddd;text-align:left;">Pick</th>
+            <th style="padding:8px 10px;border:1px solid #ddd;text-align:right;">Wager</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  async function sendEmailWithEmailJS({ picks, totalCommitted }){
+    if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === "YOUR_PUBLIC_KEY") {
+      console.warn("EmailJS is not configured; skipping email.");
+      return;
+    }
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+
+    const playerEmail = currentPlayer?.email?.trim() || "";
+    // Send to the player (if we have an email) AND your admin address
+    const to_email = [playerEmail, "wrathofmath85@gmail.com"].filter(Boolean).join(",");
+
+    const templateParams = {
+      to_email,
+      week: WEEK_LABEL,
+      user_name: currentPlayer?.name || "Unknown",
+      user_email: playerEmail || "N/A",
+      total_committed: `$${Number(totalCommitted).toFixed(2)}`,
+      picks_text: picksToText(picks),
+      picks_html: picksToHTML(picks)
+    };
+
+    try{
+      const res = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+      console.log("EmailJS sent:", res.status, res.text);
+    }catch(err){
+      console.error("EmailJS error:", err);
+      // Non-blocking: we won't alert here, since picks already submitted to the sheet
+    }
+  }
+
+  /* ===== Submit flow ===== */
+  async function submitPicks(){
+    const statusEl  = $("#submitStatus");
+    const btn       = $("#submitBtn");
+    const spinner   = $("#submitSpinner");
+
+    statusEl.textContent = "";
+
+    // NEW: enforce deadline
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      applyGlobalLocks();
+      alert(`Picks are closed. Deadline was ${formatDeadlineForDisplay()}.`);
+      return;
+    }
+
+    // NEW: enforce duplicate prevention (re-check right before submit)
+    if (!currentPlayer){
+      alert("Please select your name at the top first.");
+      return;
+    }
+    // Refresh existing picks right before submit to reduce race conditions
+    await loadExistingPicks();
+    if (playerHasExistingPicks(currentPlayer)){
+      lockReason = "already_submitted";
+      applyGlobalLocks();
+      alert(`Picks already submitted for ${currentPlayer.name} for ${WEEK_LABEL}.`);
+      return;
+    }
+
+    const picks = collectPicks();
+    if (!picks.length){
+      alert("Please make at least one pick with a wager.");
+      return;
+    }
+
+    const totalCommitted = picks.reduce((s,p)=> s + Number(p.Wager||0), 0);
+
+    if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
+      console.log("Picks that would be submitted to the sheet:", picks);
+      alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
+      // Even if sheet submit is not configured, we can still email:
+      await sendEmailWithEmailJS({ picks, totalCommitted });
+      statusEl.textContent = "Picks emailed (sheet submit not configured).";
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = "Submitting…";
+    if (spinner) spinner.style.display = "inline-block";
+
+    try{
+      // 1) Submit to your sheet
+      const params = new URLSearchParams();
+      params.append("data", JSON.stringify({
+        rows: picks,
+        week: WEEK_LABEL,
+        targetCsv: PICKS_SHEET_CSV_URL
+      }));
+
+      const resp = await fetch(SUBMIT_ENDPOINT, { method: "POST", body: params });
+      const text = await resp.text();
+      console.log("Submit response:", text);
+
+      // 2) Email via EmailJS
+      await sendEmailWithEmailJS({ picks, totalCommitted });
+
+      statusEl.textContent = "Picks submitted and emailed!";
+      alert(`Your picks for ${WEEK_LABEL} have been submitted and emailed.`);
+
+      // NEW: after successful submit, refresh + lock immediately
+      await loadExistingPicks();
+      lockReason = "already_submitted";
+      applyGlobalLocks();
+    }catch(err){
+      console.error(err);
+      statusEl.textContent = "Error submitting picks. Check console for details.";
+      alert("There was an error submitting your picks. Please try again.");
+    }finally{
+      // If we locked due to submit success, keep disabled.
+      if (lockReason !== "already_submitted" && lockReason !== "deadline"){
+        btn.disabled = false;
+      }
+      btn.textContent = "Submit Picks";
+      if (spinner) spinner.style.display = "none";
+    }
+  }
+
+  /* ===== Data loading ===== */
+  function loadPlayers(){
+    return new Promise(resolve=>{
+      Papa.parse(PLAYERS_CSV_URL,{
+        download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+        complete:res=>{
+          players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
+            name:r["Player"],
+            email:r["Email"]??"",
+            begin:parseMoney(r["Wild Card"])
+          }));
+          const sel=$("#playerSelect");
+          sel.innerHTML=`<option value="">-- Select --</option>`+
+            players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
+
+          sel.addEventListener("change",()=>{
+            currentPlayer = (sel.value === "" ? null : (players[sel.value] ?? null));
+            refreshHeaderTotals();
+            onPlayerChanged();
+          });
+
+          resolve();
+        }
+      });
+    });
+  }
+
+  function loadOdds(){
+    return new Promise(resolve=>{
+      Papa.parse(ODDS_CSV_URL,{
+        download:true,header:true,dynamicTyping:true,skipEmptyLines:true,
+        complete:res=>{renderGames(res.data||[]);resolve();}
+      });
+    });
+  }
+
+  async function initApp(){
+    const brandEl = document.querySelector(".brand");
+    if (brandEl){
+      brandEl.innerHTML = WEEK_LABEL + " Lines • <em>Pick’em</em>";
+    }
+    document.title = WEEK_LABEL + " Lines";
+
+    // NEW: load players, odds, AND existing picks (for duplicate prevention)
+    await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks()]);
+
+    const submitBtn = $("#submitBtn");
+    if (submitBtn) submitBtn.addEventListener("click", submitPicks);
+
+    // Initial lock state (no player selected yet)
+    applyGlobalLocks();
+
+    // NEW: re-check deadline periodically so it shuts off right on time
+    setInterval(()=>{ applyGlobalLocks(); }, 30 * 1000);
+  }
+
+  /* ===== Gate controlled by REVEAL_MODE ===== */
+  function setupGate(){
+    const soon = document.getElementById("comingSoon");
+    const app  = document.getElementById("mainApp");
+
+    if (REVEAL_MODE === "live"){
+      soon.style.display = "none";
+      app.style.display  = "block";
+      initApp();
+    } else {
+      soon.style.display = "flex";
+      app.style.display  = "none";
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", setupGate);
+</script>
+
+</body>
+</html>
