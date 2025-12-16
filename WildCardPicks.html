@@ -82,21 +82,21 @@
   }
   .when{color:var(--muted);font-size:.92rem;}
   .teams{font-weight:700;color:var(--orange);}
+
   .rowlabel{
     grid-column:1/-1;
     color:var(--muted);
     font-size:.84rem;
     margin-top:6px;
   }
+
+  /* Desktop/tablet default layout */
   .row{
     display:grid;
     grid-template-columns:1fr 1fr;
     gap:8px;
     align-items:stretch;
     margin:8px 0 2px;
-  }
-  @media (max-width:780px){
-    .row{grid-template-columns:1fr;}
   }
 
   .pill{
@@ -120,6 +120,7 @@
     color:#fff;
   }
 
+  /* Desktop bettors layout */
   .bettors{
     display:grid;
     grid-template-columns:1fr 1fr;
@@ -128,15 +129,89 @@
     color:var(--muted);
     margin-bottom:4px;
   }
-  @media (max-width:780px){
-    .bettors{grid-template-columns:1fr;}
-  }
   .bettors strong{color:var(--text);}
   .bettors span.name{color:var(--orange);}
   .nobets{
     color:var(--muted);
     font-size:.9rem;
     padding:6px 4px 2px;
+  }
+
+  /* ===== Mobile view (new) ===== */
+  @media (max-width:780px){
+    /* keep both pills on ONE line */
+    .row{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:8px;
+      align-items:stretch;
+      margin:8px 0 2px;
+    }
+
+    /* pills shrink to fit content if needed, stay on one line */
+    .pill{
+      flex:1 1 0;
+      min-width:0;                 /* allows shrinking */
+      padding:9px 8px;
+      border-radius:12px;
+    }
+
+    /* ensure the inside content doesn’t force wrapping */
+    .pill .name,
+    .pill .odds{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    /* Mobile bettors: list UNDER the appropriate pill */
+    .bettors{
+      display:flex;
+      gap:8px;
+      margin:6px 0 4px;
+      font-size:.82rem;
+    }
+    .bettors > div{
+      flex:1 1 0;
+      min-width:0;
+      border:1px dashed rgba(39,56,94,.8);
+      border-radius:10px;
+      padding:8px 10px;
+      background:rgba(16,27,51,0.35);
+    }
+    .bettors strong{
+      display:block;
+      margin-bottom:4px;
+      font-size:.78rem;
+      letter-spacing:.03em;
+      text-transform:uppercase;
+      color:var(--muted);
+    }
+
+    /* Make each bettor line break nicely */
+    .bettors .list{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .bettors .item{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:baseline;
+      min-width:0;
+    }
+    .bettors .item .who{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .bettors .item .amt{
+      white-space:nowrap;
+      color:var(--muted);
+      font-variant-numeric:tabular-nums;
+    }
   }
 </style>
 </head>
@@ -309,11 +384,18 @@
     return map;
   }
 
-  function buildBettorsList(bets){
-    if (!bets || !bets.length) return "No bets";
-    return bets
-      .map(b=>`<span class="name">${b.Name}</span> (${fmtMoney(b.Wager)})`)
-      .join(", ");
+  // Mobile-friendly bettors list: one bettor per line
+  function buildBettorsListHTML(bets){
+    if (!bets || !bets.length) return `<div class="list"><div class="item"><span class="who">No bets</span><span class="amt"></span></div></div>`;
+    const items = bets
+      .map(b=>`
+        <div class="item">
+          <span class="who"><span class="name">${b.Name}</span></span>
+          <span class="amt">(${fmtMoney(b.Wager)})</span>
+        </div>
+      `)
+      .join("");
+    return `<div class="list">${items}</div>`;
   }
 
   function registerWinnerToggle(pillEl, otherPill){
@@ -390,11 +472,18 @@
       r.append(leftPill, rightPill);
       game.appendChild(r);
 
+      // bettors underneath corresponding pill (mobile) / two-column (desktop)
       const b = document.createElement("div");
       b.className = "bettors";
       b.innerHTML = `
-        <div><strong>${leftBets.length ? "Bets:" : "No bets"}</strong> ${buildBettorsList(leftBets)}</div>
-        <div><strong>${rightBets.length ? "Bets:" : "No bets"}</strong> ${buildBettorsList(rightBets)}</div>
+        <div>
+          <strong>${leftLabel}</strong>
+          ${buildBettorsListHTML(leftBets)}
+        </div>
+        <div>
+          <strong>${rightLabel}</strong>
+          ${buildBettorsListHTML(rightBets)}
+        </div>
       `;
       game.appendChild(b);
     }
@@ -464,8 +553,7 @@
       bets.forEach(b=>{
         if (winners.has(b.label)){
           const payout = computePayout(b.wager, b.odds);
-          // Week winnings should be the full payout (stake + profit)
-          winnings += payout;
+          winnings += payout; // stake + profit
         }
       });
 
