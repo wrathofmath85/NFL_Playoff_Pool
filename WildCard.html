@@ -101,35 +101,18 @@
   .laces-main span:nth-child(3){left:55%;}
   .laces-main span:nth-child(4){left:75%;}
 
-  /* Countdown */
-  #countdown{
-    display:flex;
-    justify-content:center;
-    gap:10px;
-    margin:12px 0 6px;
-    flex-wrap:wrap;
-  }
-  .timeBox{
-    min-width:70px;
-    padding:8px 10px;
-    border-radius:10px;
-    background:var(--navy-2);
+  /* Coming Soon badge */
+  .csBadge{
+    display:inline-block;
+    padding:10px 14px;
     border:1px solid var(--border);
+    border-radius:999px;
+    background:var(--navy-2);
+    font-weight:800;
+    color:var(--orange);
+    margin-top:8px;
   }
-  .timeBox span{
-    display:block;
-    font-size:1.4rem;
-    font-weight:700;
-  }
-  .timeBox label{
-    display:block;
-    font-size:.7rem;
-    text-transform:uppercase;
-    letter-spacing:.08em;
-    color:var(--muted);
-    margin-top:2px;
-  }
-  .csSub{font-size:.85rem;color:var(--muted);}
+  .csSub{font-size:.85rem;color:var(--muted);margin-top:8px}
 
   /* ===== Sticky header ===== */
   .topbar{
@@ -247,34 +230,12 @@
       </div>
     </div>
     <h1>Wild Card Lines</h1>
-    <p>Get ready to make your picks!</p>
-
-    <div id="countdown">
-      <div class="timeBox">
-        <span id="cdDays">00</span>
-        <label>Days</label>
-      </div>
-      <div class="timeBox">
-        <span id="cdHours">00</span>
-        <label>Hours</label>
-      </div>
-      <div class="timeBox">
-        <span id="cdMins">00</span>
-        <label>Minutes</label>
-      </div>
-      <div class="timeBox">
-        <span id="cdSecs">00</span>
-        <label>Seconds</label>
-      </div>
-    </div>
-
-    <p class="csSub">
-      Unlocks at <span id="goLiveText"></span> (Eastern).
-    </p>
+    <span class="csBadge">Coming Soon</span>
+    <p class="csSub">Lines will be posted here. Check back shortly.</p>
   </div>
 </div>
 
-<!-- Main app (hidden until go-live) -->
+<!-- Main app (hidden until live) -->
 <div id="mainApp" style="display:none;">
   <!-- ===== Sticky header ===== -->
   <header class="topbar">
@@ -656,8 +617,6 @@
       // Show the coming soon screen (no countdown)
       soon.style.display = "flex";
       app.style.display  = "none";
-      // Optional: you can remove/hide countdown & go-live text in the HTML,
-      // but leaving them is harmless—they just won't update or display times.
     }
   }
 
