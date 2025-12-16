@@ -34,68 +34,25 @@
     justify-content:center;
     text-align:center;
   }
-  #comingSoon .csBox{
-    max-width:520px;
-    margin:auto;
-  }
+  #comingSoon .csBox{max-width:520px;margin:auto;}
   #comingSoon h1{margin:16px 0 8px;}
   #comingSoon p{color:var(--muted);font-size:0.95rem;margin:4px 0;}
 
   /* Football graphic */
   .footballGraphic{
-    width:140px;
-    height:80px;
-    margin:0 auto 12px;
-    position:relative;
+    width:140px;height:80px;margin:0 auto 12px;position:relative;
     background:radial-gradient(circle at 30% 30%, #ffb38a 0, #ffb38a 40%, #c65322 100%);
-    border-radius:999px;
-    box-shadow:0 0 25px rgba(0,0,0,0.35);
-    transform:rotate(-12deg);
+    border-radius:999px;box-shadow:0 0 25px rgba(0,0,0,0.35);transform:rotate(-12deg);
   }
-  .footballGraphic::before,
-  .footballGraphic::after{
-    content:"";
-    position:absolute;
-    top:50%;
-    width:18px;
-    height:18px;
-    border-radius:50%;
-    border:3px solid #f8d9c4;
-    border-color:#f8d9c4 transparent;
+  .footballGraphic::before,.footballGraphic::after{
+    content:"";position:absolute;top:50%;width:18px;height:18px;border-radius:50%;
+    border:3px solid #f8d9c4;border-color:#f8d9c4 transparent;
   }
-  .footballGraphic::before{
-    left:-6px;
-    transform:translateY(-50%) rotate(20deg);
-  }
-  .footballGraphic::after{
-    right:-6px;
-    transform:translateY(-50%) rotate(-20deg);
-  }
-  .laces{
-    position:absolute;
-    top:50%;
-    left:50%;
-    transform:translate(-50%, -50%) rotate(12deg);
-    width:70px;
-    height:18px;
-  }
-  .laces-main{
-    position:absolute;
-    top:50%;
-    left:0;
-    right:0;
-    height:3px;
-    background:#fdf6ee;
-    transform:translateY(-50%);
-  }
-  .laces-main span{
-    position:absolute;
-    top:50%;
-    width:2px;
-    height:11px;
-    background:#fdf6ee;
-    transform:translateY(-50%);
-  }
+  .footballGraphic::before{left:-6px;transform:translateY(-50%) rotate(20deg);}
+  .footballGraphic::after{right:-6px;transform:translateY(-50%) rotate(-20deg);}
+  .laces{position:absolute;top:50%;left:50%;transform:translate(-50%, -50%) rotate(12deg);width:70px;height:18px;}
+  .laces-main{position:absolute;top:50%;left:0;right:0;height:3px;background:#fdf6ee;transform:translateY(-50%);}
+  .laces-main span{position:absolute;top:50%;width:2px;height:11px;background:#fdf6ee;transform:translateY(-50%);}
   .laces-main span:nth-child(1){left:15%;}
   .laces-main span:nth-child(2){left:35%;}
   .laces-main span:nth-child(3){left:55%;}
@@ -103,29 +60,19 @@
 
   /* Coming Soon badge */
   .csBadge{
-    display:inline-block;
-    padding:10px 14px;
-    border:1px solid var(--border);
-    border-radius:999px;
-    background:var(--navy-2);
-    font-weight:800;
-    color:var(--orange);
-    margin-top:8px;
+    display:inline-block;padding:10px 14px;border:1px solid var(--border);border-radius:999px;
+    background:var(--navy-2);font-weight:800;color:var(--orange);margin-top:8px;
   }
   .csSub{font-size:.85rem;color:var(--muted);margin-top:8px}
 
   /* ===== Sticky header ===== */
   .topbar{
-    position:sticky;top:0;z-index:50;
-    backdrop-filter:saturate(130%) blur(4px);
-    background:color-mix(in srgb, var(--navy) 85%, black 15%);
-    border-bottom:2px solid var(--orange);
+    position:sticky;top:0;z-index:50;backdrop-filter:saturate(130%) blur(4px);
+    background:color-mix(in srgb, var(--navy) 85%, black 15%);border-bottom:2px solid var(--orange);
   }
   .topbar .inner{
-    max-width:1100px;margin:auto;padding:10px 22px;
-    display:grid;gap:10px;
-    grid-template-columns:1fr repeat(3,minmax(140px,auto));
-    align-items:end
+    max-width:1100px;margin:auto;padding:10px 22px;display:grid;gap:10px;
+    grid-template-columns:1fr repeat(3,minmax(140px,auto));align-items:end
   }
   .brand{font-weight:800;letter-spacing:.3px}
   .brand em{color:var(--orange);font-style:normal}
@@ -135,9 +82,7 @@
     appearance:none;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
     background:var(--navy-2);color:var(--text);padding:10px 12px;font-size:15px;outline:none;
   }
-  .totals{
-    display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px
-  }
+  .totals{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px}
   .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
   .chip strong{color:var(--orange)}
   @media (max-width:860px){
@@ -158,24 +103,12 @@
   @media (max-width:780px){.row{grid-template-columns:1fr}}
 
   .pill{
-    border:1px solid var(--border);
-    background:var(--navy-2);
-    border-radius:10px;
-    padding:10px;
-    cursor:pointer;
-    display:flex;
-    justify-content:space-between;
-    gap:8px;
-    color:var(--orange);
-    font-weight:600;
+    border:1px solid var(--border);background:var(--navy-2);border-radius:10px;padding:10px;cursor:pointer;
+    display:flex;justify-content:space-between;gap:8px;color:var(--orange);font-weight:600;
     transition:background .15s,box-shadow .15s,color .15s;
   }
   .pill:hover{background:#16264a;color:#ff6a1a}
-  .pill.active{
-    box-shadow:0 0 0 2px var(--orange) inset;
-    background:#1c2946;
-    color:#fff;
-  }
+  .pill.active{box-shadow:0 0 0 2px var(--orange) inset;background:#1c2946;color:#fff;}
   .pill .odds{opacity:.9}
 
   .money input{
@@ -191,30 +124,18 @@
 
   /* submit button in header */
   .submitBtn{
-    padding:8px 18px;
-    border-radius:999px;
-    border:1px solid var(--orange);
-    background:var(--orange);
-    color:#fff;
-    font-weight:700;
-    cursor:pointer;
-    font-size:.9rem;
+    padding:8px 18px;border-radius:999px;border:1px solid var(--orange);background:var(--orange);
+    color:#fff;font-weight:700;cursor:pointer;font-size:.9rem;
   }
   .submitBtn[disabled]{opacity:.6;cursor:default}
   .submitBtn:hover:not([disabled]){background:#ff6a1a}
 
   /* spinner */
   .spinner{
-    width:18px;height:18px;
-    border-radius:50%;
-    border:2px solid rgba(255,255,255,.3);
-    border-top-color:#fff;
-    animation:spin .7s linear infinite;
-    display:none;
+    width:18px;height:18px;border-radius:50%;border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;animation:spin .7s linear infinite;display:none;
   }
-  @keyframes spin{
-    to{transform:rotate(360deg);}
-  }
+  @keyframes spin{to{transform:rotate(360deg);}}
 </style>
 </head>
 <body>
@@ -270,10 +191,14 @@
   </div>
 </div>
 
+<!-- PapaParse -->
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<!-- EmailJS SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+
 <script>
   /* ===== Simple gate: set to "comingSoon" or "live" ===== */
-  const REVEAL_MODE = "live"; // <-- change to "live" or "comingSoon" to show the app
+  const REVEAL_MODE = "live"; // change to "comingSoon" to hide the app
 
   /* ===== Config / URLs ===== */
   const WEEK_LABEL = "Wild Card"; // header + Week column
@@ -287,22 +212,17 @@
   // Apps Script web-app URL that appends to the sheet
   const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
 
+  /* ===== EmailJS: fill these in ===== */
+  const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
+  const EMAILJS_SERVICE_ID = "service_txqdfck";
+  const EMAILJS_TEMPLATE_ID = "template_w10bpov";
+
   /* ===== Odds sheet columns ===== */
   const COLS = {
-    date: "Date",
-    time: "Time",
-    channel: "Channel",
-    away: "Away",
-    aSu: "A SU Line",
-    aSpread: "A Spread",
-    aSpreadLine: "A Spread Line",
-    home: "Home",
-    hSu: "H SU Line",
-    hSpread: "H Spread",
-    hSpreadLine: "H Spread Line",
-    ouTotal: "Over/Under",
-    oLine: "O Line",
-    uLine: "U Line"
+    date: "Date", time: "Time", channel: "Channel",
+    away: "Away", aSu: "A SU Line", aSpread: "A Spread", aSpreadLine: "A Spread Line",
+    home: "Home", hSu: "H SU Line", hSpread: "H Spread", hSpreadLine: "H Spread Line",
+    ouTotal: "Over/Under", oLine: "O Line", uLine: "U Line"
   };
 
   let players = [];
@@ -502,6 +422,7 @@
           picks.push({
             Week: WEEK_LABEL,
             Name: currentPlayer.name,
+            Email: currentPlayer.email || "",
             Pick: pickLabel,
             Wager: wager
           });
@@ -511,6 +432,62 @@
     return picks;
   }
 
+  /* ===== Email building & sending ===== */
+  function picksToText(picks){
+    if (!picks.length) return "No picks.";
+    const lines = picks.map(p => `- ${p.Pick} — $${Number(p.Wager).toFixed(2)}`);
+    return lines.join("\n");
+  }
+  function picksToHTML(picks){
+    if (!picks.length) return "<p>No picks.</p>";
+    const rows = picks.map(p => `
+      <tr>
+        <td style="padding:6px 10px;border:1px solid #ddd;">${p.Pick}</td>
+        <td style="padding:6px 10px;border:1px solid #ddd;text-align:right;">$${Number(p.Wager).toFixed(2)}</td>
+      </tr>`).join("");
+    return `
+      <table cellpadding="0" cellspacing="0" style="border-collapse:collapse;width:100%;max-width:560px;">
+        <thead>
+          <tr>
+            <th style="padding:8px 10px;border:1px solid #ddd;text-align:left;">Pick</th>
+            <th style="padding:8px 10px;border:1px solid #ddd;text-align:right;">Wager</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+  }
+
+  async function sendEmailWithEmailJS({ picks, totalCommitted }){
+    if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === "YOUR_PUBLIC_KEY") {
+      console.warn("EmailJS is not configured; skipping email.");
+      return;
+    }
+    emailjs.init(EMAILJS_PUBLIC_KEY);
+
+    const playerEmail = currentPlayer?.email?.trim() || "";
+    // Send to the player (if we have an email) AND your admin address
+    const to_email = [playerEmail, "wrathofmath85@gmail.com"].filter(Boolean).join(",");
+
+    const templateParams = {
+      to_email,
+      week: WEEK_LABEL,
+      user_name: currentPlayer?.name || "Unknown",
+      user_email: playerEmail || "N/A",
+      total_committed: `$${Number(totalCommitted).toFixed(2)}`,
+      picks_text: picksToText(picks),
+      picks_html: picksToHTML(picks)
+    };
+
+    try{
+      const res = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
+      console.log("EmailJS sent:", res.status, res.text);
+    }catch(err){
+      console.error("EmailJS error:", err);
+      // Non-blocking: we won't alert here, since picks already submitted to the sheet
+    }
+  }
+
+  /* ===== Submit flow ===== */
   async function submitPicks(){
     const statusEl  = $("#submitStatus");
     const btn       = $("#submitBtn");
@@ -520,12 +497,18 @@
 
     const picks = collectPicks();
     if (!picks.length){
+      alert("Please make at least one pick with a wager.");
       return;
     }
+
+    const totalCommitted = picks.reduce((s,p)=> s + Number(p.Wager||0), 0);
 
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
       console.log("Picks that would be submitted to the sheet:", picks);
       alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
+      // Even if sheet submit is not configured, we can still email:
+      await sendEmailWithEmailJS({ picks, totalCommitted });
+      statusEl.textContent = "Picks emailed (sheet submit not configured).";
       return;
     }
 
@@ -534,6 +517,7 @@
     if (spinner) spinner.style.display = "inline-block";
 
     try{
+      // 1) Submit to your sheet
       const params = new URLSearchParams();
       params.append("data", JSON.stringify({
         rows: picks,
@@ -541,15 +525,15 @@
         targetCsv: PICKS_SHEET_CSV_URL
       }));
 
-      const resp = await fetch(SUBMIT_ENDPOINT, {
-        method: "POST",
-        body: params
-      });
-
+      const resp = await fetch(SUBMIT_ENDPOINT, { method: "POST", body: params });
       const text = await resp.text();
       console.log("Submit response:", text);
-      statusEl.textContent = "Picks submitted!";
-      alert("Your picks for " + WEEK_LABEL + " have been submitted.");
+
+      // 2) Email via EmailJS (non-blocking for UI, but we await to catch errors)
+      await sendEmailWithEmailJS({ picks, totalCommitted });
+
+      statusEl.textContent = "Picks submitted and emailed!";
+      alert(`Your picks for ${WEEK_LABEL} have been submitted and emailed.`);
     }catch(err){
       console.error(err);
       statusEl.textContent = "Error submitting picks. Check console for details.";
@@ -568,7 +552,9 @@
         download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
         complete:res=>{
           players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
-            name:r["Player"],email:r["Email"]??"",begin:parseMoney(r["Wild Card"])
+            name:r["Player"],
+            email:r["Email"]??"",
+            begin:parseMoney(r["Wild Card"])
           }));
           const sel=$("#playerSelect");
           sel.innerHTML=`<option value="">-- Select --</option>`+
@@ -614,7 +600,6 @@
       app.style.display  = "block";
       initApp();
     } else {
-      // Show the coming soon screen (no countdown)
       soon.style.display = "flex";
       app.style.display  = "none";
     }
