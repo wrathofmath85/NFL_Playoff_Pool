@@ -1,3 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wild Card Lines</title>
+<style>
+  /* ===== Chicago Bears palette ===== */
+  :root{
+    --navy:#0B162A;
+    --navy-2:#101b33;
+    --navy-3:#0e1424;
+    --orange:#DC4405;
+    --muted:#a9b5c7;
+    --border:#27385e;
+    --text:#eef3ff;
+  }
+
+  html,body{
+    margin:0;
+    background:var(--navy);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+  }
+  .wrap{max-width:1100px;margin:auto;padding:16px 22px 28px;}
+
+  /* ===== Coming soon screen ===== */
+  #comingSoon{
+    min-height:100vh;
+    box-sizing:border-box;
+    padding:40px 20px;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    text-align:center;
+  }
+  #comingSoon .csBox{
+    max-width:520px;
+    margin:auto;
+  }
+  #comingSoon h1{margin:16px 0 8px;}
+  #comingSoon p{color:var(--muted);font-size:0.95rem;margin:4px 0;}
+
+  /* Football graphic */
+  .footballGraphic{
+    width:140px;
+    height:80px;
+    margin:0 auto 12px;
+    position:relative;
+    background:radial-gradient(circle at 30% 30%, #ffb38a 0, #ffb38a 40%, #c65322 100%);
+    border-radius:999px;
+    box-shadow:0 0 25px rgba(0,0,0,0.35);
+    transform:rotate(-12deg);
+  }
+  .footballGraphic::before,
+  .footballGraphic::after{
+    content:"";
+    position:absolute;
+    top:50%;
+    width:18px;
+    height:18px;
+    border-radius:50%;
+    border:3px solid #f8d9c4;
+    border-color:#f8d9c4 transparent;
+  }
+  .footballGraphic::before{
+    left:-6px;
+    transform:translateY(-50%) rotate(20deg);
+  }
+  .footballGraphic::after{
+    right:-6px;
+    transform:translateY(-50%) rotate(-20deg);
+  }
+  .laces{
+    position:absolute;
+    top:50%;
+    left:50%;
+    transform:translate(-50%, -50%) rotate(12deg);
+    width:70px;
+    height:18px;
+  }
+  .laces-main{
+    position:absolute;
+    top:50%;
+    left:0;
+    right:0;
+    height:3px;
+    background:#fdf6ee;
+    transform:translateY(-50%);
+  }
+  .laces-main span{
+    position:absolute;
+    top:50%;
+    width:2px;
+    height:11px;
+    background:#fdf6ee;
+    transform:translateY(-50%);
+  }
+  .laces-main span:nth-child(1){left:15%;}
+  .laces-main span:nth-child(2){left:35%;}
+  .laces-main span:nth-child(3){left:55%;}
+  .laces-main span:nth-child(4){left:75%;}
+
+  /* Countdown */
+  #countdown{
+    display:flex;
+    justify-content:center;
+    gap:10px;
+    margin:12px 0 6px;
+    flex-wrap:wrap;
+  }
+  .timeBox{
+    min-width:70px;
+    padding:8px 10px;
+    border-radius:10px;
+    background:var(--navy-2);
+    border:1px solid var(--border);
+  }
+  .timeBox span{
+    display:block;
+    font-size:1.4rem;
+    font-weight:700;
+  }
+  .timeBox label{
+    display:block;
+    font-size:.7rem;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--muted);
+    margin-top:2px;
+  }
+  .csSub{font-size:.85rem;color:var(--muted);}
+
+  /* ===== Sticky header ===== */
+  .topbar{
+    position:sticky;top:0;z-index:50;
+    backdrop-filter:saturate(130%) blur(4px);
+    background:color-mix(in srgb, var(--navy) 85%, black 15%);
+    border-bottom:2px solid var(--orange);
+  }
+  .topbar .inner{
+    max-width:1100px;margin:auto;padding:10px 22px;
+    display:grid;gap:10px;
+    grid-template-columns:1fr repeat(3,minmax(140px,auto));
+    align-items:end
+  }
+  .brand{font-weight:800;letter-spacing:.3px}
+  .brand em{color:var(--orange);font-style:normal}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:.78rem;color:var(--muted)}
+  select,input.read{
+    appearance:none;width:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
+    background:var(--navy-2);color:var(--text);padding:10px 12px;font-size:15px;outline:none;
+  }
+  .totals{
+    display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:6px
+  }
+  .chip{border:1px solid var(--border);background:var(--navy-2);border-radius:999px;padding:6px 10px;font-size:.9rem}
+  .chip strong{color:var(--orange)}
+  @media (max-width:860px){
+    .topbar .inner{grid-template-columns:1fr}
+    .field{max-width:100%}
+    .totals{justify-content:flex-start}
+  }
+
+  /* ===== Games ===== */
+  h1{margin:14px 0 8px}
+  .hint{color:var(--muted);margin:0 0 12px}
+  .game{background:var(--navy-3);border:1px solid var(--border);border-radius:16px;padding:14px;margin:12px 0}
+  .head{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px dashed var(--border);padding:0 4px 10px;margin-bottom:8px}
+  .when{color:var(--muted);font-size:.92rem}
+  .teams{font-weight:700;color:var(--orange)}
+  .rowlabel{grid-column:1/-1;color:var(--muted);font-size:.84rem;margin-top:6px}
+  .row{display:grid;grid-template-columns:1fr 1fr 120px 140px;gap:8px;align-items:stretch;margin:8px 0}
+  @media (max-width:780px){.row{grid-template-columns:1fr}}
+
+  .pill{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:10px;
+    padding:10px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    color:var(--orange);
+    font-weight:600;
+    transition:background .15s,box-shadow .15s,color .15s;
+  }
+  .pill:hover{background:#16264a;color:#ff6a1a}
+  .pill.active{
+    box-shadow:0 0 0 2px var(--orange) inset;
+    background:#1c2946;
+    color:#fff;
+  }
+  .pill .odds{opacity:.9}
+
+  .money input{
+    width:100%;height:100%;box-sizing:border-box;border-radius:10px;border:1px solid var(--border);
+    background:var(--navy-2);color:var(--text);font-size:16px;padding:10px 12px;outline:none;
+  }
+  .payout{
+    background:var(--navy-2);border:1px solid var(--border);border-radius:10px;display:flex;align-items:center;justify-content:center;
+    font-weight:800;color:var(--orange)
+  }
+  .warn{color:#ffd18c;font-size:.85rem;margin-top:2px}
+  footer{color:var(--muted);font-size:.85rem;margin-top:18px}
+
+  /* submit button in header */
+  .submitBtn{
+    padding:8px 18px;
+    border-radius:999px;
+    border:1px solid var(--orange);
+    background:var(--orange);
+    color:#fff;
+    font-weight:700;
+    cursor:pointer;
+    font-size:.9rem;
+  }
+  .submitBtn[disabled]{opacity:.6;cursor:default}
+  .submitBtn:hover:not([disabled]){background:#ff6a1a}
+
+  /* spinner */
+  .spinner{
+    width:18px;height:18px;
+    border-radius:50%;
+    border:2px solid rgba(255,255,255,.3);
+    border-top-color:#fff;
+    animation:spin .7s linear infinite;
+    display:none;
+  }
+  @keyframes spin{
+    to{transform:rotate(360deg);}
+  }
+</style>
+</head>
+<body>
+
+<!-- Coming soon gate -->
+<div id="comingSoon">
+  <div class="csBox">
+    <div class="footballGraphic">
+      <div class="laces">
+        <div class="laces-main">
+          <span></span><span></span><span></span><span></span>
+        </div>
+      </div>
+    </div>
+    <h1>Wild Card Lines</h1>
+    <p>Get ready to make your picks!</p>
+
+    <div id="countdown">
+      <div class="timeBox">
+        <span id="cdDays">00</span>
+        <label>Days</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdHours">00</span>
+        <label>Hours</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdMins">00</span>
+        <label>Minutes</label>
+      </div>
+      <div class="timeBox">
+        <span id="cdSecs">00</span>
+        <label>Seconds</label>
+      </div>
+    </div>
+
+    <p class="csSub">
+      Unlocks at <span id="goLiveText"></span> (Eastern).
+    </p>
+  </div>
+</div>
+
+<!-- Main app (hidden until go-live) -->
+<div id="mainApp" style="display:none;">
+  <!-- ===== Sticky header ===== -->
+  <header class="topbar">
+    <div class="inner">
+      <div class="field" style="grid-column:1 / -1">
+        <div class="brand">Wild Card Lines • <em>Pick’em</em></div>
+        <div class="totals">
+          <span class="chip">Email: <strong id="hdrEmail">—</strong></span>
+          <span class="chip">Begin: <strong id="hdrBegin">$0.00</strong></span>
+          <span class="chip">Remaining: <strong id="hdrRemain">$0.00</strong></span>
+          <span class="chip">Committed: <strong id="hdrCommitted">$0.00</strong></span>
+          <button id="submitBtn" class="submitBtn">Submit Picks</button>
+          <div id="submitSpinner" class="spinner" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="field" style="grid-column:1 / -1">
+        <label for="playerSelect">Select your name</label>
+        <select id="playerSelect"><option>Loading players…</option></select>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <h1>Games</h1>
+    <p class="hint">Each game has <b>Moneyline</b>, <b>Spread</b>, and <b>Total (O/U)</b> rows. Click a pill, type a wager, and we’ll compute <em>To Win</em> for that row. Your <b>Remaining</b> budget updates automatically and wagers are capped to your Begin amount.</p>
+
+    <div id="games"></div>
+
+    <div id="submitStatus" class="hint"></div>
+
+    <footer>Payout: negative odds → wager + (wager / |odds|) * 100; positive odds → wager + (wager / 100) * odds.</footer>
+  </div>
+</div>
+
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
   /* ===== Simple gate: set to "comingSoon" or "live" ===== */
@@ -352,3 +663,6 @@
 
   document.addEventListener("DOMContentLoaded", setupGate);
 </script>
+
+</body>
+</html>
