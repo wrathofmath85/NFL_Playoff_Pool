@@ -38,6 +38,45 @@
   }
   .error{color:#ff9b9b;}
 
+  /* ===== Reveal gate ===== */
+  .gate{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px 18px;
+    margin:14px 0;
+    text-align:center;
+  }
+  .gate h2{margin:0 0 8px;}
+  .gate .sub{color:var(--muted);margin:0 0 14px;font-size:.95rem;}
+  .countdown{
+    display:inline-flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-top:4px;
+  }
+  .cdBox{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:12px;
+    padding:10px 12px;
+    min-width:84px;
+  }
+  .cdNum{
+    font-size:1.35rem;
+    font-weight:800;
+    color:var(--orange);
+    line-height:1.1;
+  }
+  .cdLbl{
+    font-size:.75rem;
+    color:var(--muted);
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    margin-top:4px;
+  }
+
   /* ===== Standings table ===== */
   table{
     border-collapse:collapse;
@@ -129,7 +168,6 @@
     color:var(--muted);
     margin-bottom:4px;
   }
-  .bettors strong{color:var(--text);}
   .bettors span.name{color:var(--orange);}
   .nobets{
     color:var(--muted);
@@ -137,7 +175,7 @@
     padding:6px 4px 2px;
   }
 
-  /* ===== Mobile view (new) ===== */
+  /* ===== Mobile view ===== */
   @media (max-width:780px){
     /* keep both pills on ONE line */
     .row{
@@ -179,14 +217,6 @@
       padding:8px 10px;
       background:rgba(16,27,51,0.35);
     }
-    .bettors strong{
-      display:block;
-      margin-bottom:4px;
-      font-size:.78rem;
-      letter-spacing:.03em;
-      text-transform:uppercase;
-      color:var(--muted);
-    }
 
     /* Make each bettor line break nicely */
     .bettors .list{
@@ -225,30 +255,49 @@
     <b>Total Money</b> = current money + week winnings.
   </p>
 
-  <h2>Standings</h2>
-  <div id="standingsStatus" class="loading">Loading data…</div>
-  <table id="standingsTable" style="display:none;">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Player</th>
-        <th>Current Money</th>
-        <th>Week Winnings</th>
-        <th>Total Money</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <!-- Reveal gate -->
+  <div id="revealGate" class="gate" style="display:none;">
+    <h2>Picks revealed at</h2>
+    <p class="sub"><span id="revealAtText"></span> (ET)</p>
+    <div class="countdown" aria-label="Countdown to reveal">
+      <div class="cdBox"><div class="cdNum" id="cdDays">0</div><div class="cdLbl">Days</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdHours">0</div><div class="cdLbl">Hours</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdMins">0</div><div class="cdLbl">Minutes</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdSecs">0</div><div class="cdLbl">Seconds</div></div>
+    </div>
+  </div>
 
-  <h2>Games</h2>
-  <div id="gamesStatus" class="loading">Loading games…</div>
-  <div id="games"></div>
+  <!-- Real content wrapper (hidden until reveal time) -->
+  <div id="realContent" style="display:none;">
+    <h2>Standings</h2>
+    <div id="standingsStatus" class="loading">Loading data…</div>
+    <table id="standingsTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Current Money</th>
+          <th>Week Winnings</th>
+          <th>Total Money</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Games</h2>
+    <div id="gamesStatus" class="loading">Loading games…</div>
+    <div id="games"></div>
+  </div>
 </div>
 
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
 <script>
   /* ===== Config / URLs ===== */
   const WEEK_FILTER = "Wild Card"; // change if you later show Divisional, etc.
+
+  // ✅ SET THIS: reveal time in EASTERN TIME
+  // Format: "YYYY-MM-DDTHH:MM:SS" (24-hour clock)
+  const REVEAL_AT_ET = "2025-01-01T12:00:00"; // <-- change me
 
   const PICKS_CSV_URL   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
   const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
@@ -286,6 +335,54 @@
     return w + (w/100)*o;
   }
 
+  /* ===== ET helpers (DST-safe by asking Intl for offsets) ===== */
+  function getEtOffsetMinutesFor(date){
+    // returns ET offset in minutes from UTC for the provided instant
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      timeZoneName: "shortOffset",
+      year:"numeric", month:"2-digit", day:"2-digit",
+      hour:"2-digit", minute:"2-digit", second:"2-digit",
+      hour12:false
+    }).formatToParts(date);
+
+    const tz = parts.find(p=>p.type==="timeZoneName")?.value || "GMT-05:00";
+    // tz like "GMT-05:00" or "GMT-04:00"
+    const m = tz.match(/GMT([+-])(\d{2}):?(\d{2})?/);
+    if(!m) return -300;
+    const sign = m[1] === "-" ? -1 : 1;
+    const hh = parseInt(m[2],10);
+    const mm = parseInt(m[3] || "0",10);
+    return sign * (hh*60 + mm);
+  }
+
+  function parseEtLocalToUtc(etLocal){
+    // etLocal: "YYYY-MM-DDTHH:MM:SS" interpreted as America/New_York local time
+    const m = etLocal.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
+    if(!m) throw new Error("Bad REVEAL_AT_ET format. Use YYYY-MM-DDTHH:MM:SS");
+    const [_, Y, Mo, D, H, Mi, S] = m;
+    const guessUtc = new Date(Date.UTC(+Y, +Mo-1, +D, +H, +Mi, +(S||0)));
+    const offsetMin = getEtOffsetMinutesFor(guessUtc);
+    // local ET = UTC + offset  => UTC = local - offset
+    const utcMs = Date.UTC(+Y, +Mo-1, +D, +H, +Mi, +(S||0)) - (offsetMin * 60 * 1000);
+    return new Date(utcMs);
+  }
+
+  function formatEtNice(etLocal){
+    const revealUtc = parseEtLocalToUtc(etLocal);
+    const s = new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      weekday:"long",
+      month:"long",
+      day:"numeric",
+      year:"numeric",
+      hour:"numeric",
+      minute:"2-digit"
+    }).format(revealUtc);
+    return s;
+  }
+
+  /* ===== Data ===== */
   let picks = [];          // raw picks
   let players = [];        // {name,email,begin,wild}
   let oddsRows = [];       // raw odds rows
@@ -384,9 +481,11 @@
     return map;
   }
 
-  // Mobile-friendly bettors list: one bettor per line
+  // List ONLY the picks (people + wager)
   function buildBettorsListHTML(bets){
-    if (!bets || !bets.length) return `<div class="list"><div class="item"><span class="who">No bets</span><span class="amt"></span></div></div>`;
+    if (!bets || !bets.length) {
+      return `<div class="list"><div class="item"><span class="who">No bets</span><span class="amt"></span></div></div>`;
+    }
     const items = bets
       .map(b=>`
         <div class="item">
@@ -472,18 +571,12 @@
       r.append(leftPill, rightPill);
       game.appendChild(r);
 
-      // bettors underneath corresponding pill (mobile) / two-column (desktop)
+      // bettors underneath corresponding pill; ONLY list picks
       const b = document.createElement("div");
       b.className = "bettors";
       b.innerHTML = `
-        <div>
-          <strong>${leftLabel}</strong>
-          ${buildBettorsListHTML(leftBets)}
-        </div>
-        <div>
-          <strong>${rightLabel}</strong>
-          ${buildBettorsListHTML(rightBets)}
-        </div>
+        <div>${buildBettorsListHTML(leftBets)}</div>
+        <div>${buildBettorsListHTML(rightBets)}</div>
       `;
       game.appendChild(b);
     }
@@ -581,7 +674,34 @@
     statusEl.textContent = "";
   }
 
-  async function init(){
+  /* ===== Reveal gate logic ===== */
+  let countdownTimer = null;
+
+  function setCountdown(msLeft){
+    const totalSec = Math.max(0, Math.floor(msLeft / 1000));
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+
+    document.getElementById("cdDays").textContent  = String(days);
+    document.getElementById("cdHours").textContent = String(hours).padStart(2,"0");
+    document.getElementById("cdMins").textContent  = String(mins).padStart(2,"0");
+    document.getElementById("cdSecs").textContent  = String(secs).padStart(2,"0");
+  }
+
+  function showGate(revealEtNice){
+    document.getElementById("revealAtText").textContent = revealEtNice;
+    document.getElementById("revealGate").style.display = "block";
+    document.getElementById("realContent").style.display = "none";
+  }
+
+  function showContent(){
+    document.getElementById("revealGate").style.display = "none";
+    document.getElementById("realContent").style.display = "block";
+  }
+
+  async function loadAndRender(){
     const standingsStatus = document.getElementById("standingsStatus");
     const gamesStatus = document.getElementById("gamesStatus");
     try{
@@ -613,7 +733,31 @@
     }
   }
 
-  init();
+  function initRevealGate(){
+    const revealUtc = parseEtLocalToUtc(REVEAL_AT_ET);
+    const revealNice = formatEtNice(REVEAL_AT_ET);
+
+    const tick = async ()=>{
+      const now = new Date();
+      const msLeft = revealUtc.getTime() - now.getTime();
+
+      if (msLeft <= 0){
+        if (countdownTimer) clearInterval(countdownTimer);
+        showContent();
+        await loadAndRender();
+        return;
+      }
+
+      showGate(revealNice);
+      setCountdown(msLeft);
+    };
+
+    // run immediately and then every second
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  initRevealGate();
 </script>
 </body>
 </html>
