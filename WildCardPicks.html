@@ -14,6 +14,8 @@
     --muted:#a9b5c7;
     --border:#27385e;
     --text:#eef3ff;
+    --danger:#ff9b9b;
+    --ok:#9bffbf;
   }
 
   html,body{
@@ -36,7 +38,7 @@
     color:var(--muted);
     font-size:.9rem;
   }
-  .error{color:#ff9b9b;}
+  .error{color:var(--danger);}
 
   /* ===== Reveal gate ===== */
   .gate{
@@ -127,7 +129,20 @@
     color:var(--muted);
     font-size:.84rem;
     margin-top:6px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
   }
+  .lockedTag{
+    font-size:.75rem;
+    color:var(--muted);
+    border:1px solid var(--border);
+    background:rgba(16,27,51,0.35);
+    padding:4px 8px;
+    border-radius:999px;
+  }
+  .lockedTag b{ color:var(--ok); font-weight:800; }
 
   /* Desktop/tablet default layout */
   .row{
@@ -149,7 +164,8 @@
     color:var(--orange);
     font-weight:600;
     cursor:pointer;
-    transition:background .15s,box-shadow .15s,color .15s;
+    transition:background .15s,box-shadow .15s,color .15s,opacity .15s;
+    user-select:none;
   }
   .pill .odds{opacity:.9;}
   .pill:hover{background:#16264a;color:#ff6a1a;}
@@ -157,6 +173,15 @@
     box-shadow:0 0 0 2px var(--orange) inset;
     background:#1c2946;
     color:#fff;
+  }
+  .pill.disabled{
+    cursor:not-allowed;
+    opacity:.55;
+    filter:saturate(0.8);
+  }
+  .pill.disabled:hover{
+    background:var(--navy-2);
+    color:var(--orange);
   }
 
   /* Desktop bettors layout */
@@ -175,9 +200,56 @@
     padding:6px 4px 2px;
   }
 
+  /* ===== Admin footer ===== */
+  .adminBox{
+    margin-top:18px;
+    padding:14px;
+    border:1px solid var(--border);
+    background:rgba(16,27,51,0.35);
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .adminBox .left{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:240px;
+  }
+  .adminBox .title{
+    font-weight:800;
+    color:var(--orange);
+  }
+  .adminBox .sub{
+    color:var(--muted);
+    font-size:.85rem;
+  }
+  .btn{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px 14px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .btn:hover{ background:#16264a; }
+  .btn:disabled{
+    cursor:not-allowed;
+    opacity:.6;
+  }
+  .adminStatus{
+    color:var(--muted);
+    font-size:.85rem;
+  }
+  .adminStatus.ok{ color:var(--ok); }
+  .adminStatus.bad{ color:var(--danger); }
+
   /* ===== Mobile view ===== */
   @media (max-width:780px){
-    /* keep both pills on ONE line */
     .row{
       display:flex;
       flex-wrap:nowrap;
@@ -185,24 +257,18 @@
       align-items:stretch;
       margin:8px 0 2px;
     }
-
-    /* pills shrink to fit content if needed, stay on one line */
     .pill{
       flex:1 1 0;
-      min-width:0;                 /* allows shrinking */
+      min-width:0;
       padding:9px 8px;
       border-radius:12px;
     }
-
-    /* ensure the inside content doesn’t force wrapping */
     .pill .name,
     .pill .odds{
       white-space:nowrap;
       overflow:hidden;
       text-overflow:ellipsis;
     }
-
-    /* Mobile bettors: list UNDER the appropriate pill */
     .bettors{
       display:flex;
       gap:8px;
@@ -217,8 +283,6 @@
       padding:8px 10px;
       background:rgba(16,27,51,0.35);
     }
-
-    /* Make each bettor line break nicely */
     .bettors .list{
       display:flex;
       flex-direction:column;
@@ -249,7 +313,7 @@
 <div class="wrap">
   <h1>Wild Card Picks – Summary & Standings</h1>
   <p class="hint">
-    Click a side in any game below to mark it as the winner. Standings update automatically:
+    Click a side in any game below to mark it as the winner. Standings update automatically from the winners saved in the Odds sheet:
     <b>Current Money</b> = Wild Card bankroll − bets this week;
     <b>Week Winnings</b> = total returns from winning bets (stake + profit);
     <b>Total Money</b> = current money + week winnings.
@@ -287,6 +351,18 @@
     <h2>Games</h2>
     <div id="gamesStatus" class="loading">Loading games…</div>
     <div id="games"></div>
+
+    <!-- Admin -->
+    <div class="adminBox">
+      <div class="left">
+        <div class="title">Admin</div>
+        <div class="sub">Sets winners in the Odds sheet and locks results.</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button id="btnUpdateResults" class="btn">Update Results</button>
+        <span id="adminStatus" class="adminStatus"></span>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -303,6 +379,9 @@
   const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
   const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
 
+  // ✅ SET THIS after you deploy your Apps Script as a Web App (ends with /exec)
+  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzAxvkhsyLJHdlBn0y-wRT1Nybw5Z0WVsqH5XHDQhmgjb-kOYYzrqTWjpeXT6kdSsDp/exec";
+
   /* Odds sheet columns */
   const COLS = {
     date: "Date",
@@ -318,7 +397,12 @@
     hSpreadLine: "H Spread Line",
     ouTotal: "Over/Under",
     oLine: "O Line",
-    uLine: "U Line"
+    uLine: "U Line",
+
+    // ✅ Winners (must exist in your Odds sheet header exactly like this)
+    suWinner: "S/U Winner",
+    spreadWinner: "Spread Winner",
+    ouWinner: "Over/Under Winner"
   };
 
   const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
@@ -337,7 +421,6 @@
 
   /* ===== ET helpers (DST-safe by asking Intl for offsets) ===== */
   function getEtOffsetMinutesFor(date){
-    // returns ET offset in minutes from UTC for the provided instant
     const parts = new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York",
       timeZoneName: "shortOffset",
@@ -347,7 +430,6 @@
     }).formatToParts(date);
 
     const tz = parts.find(p=>p.type==="timeZoneName")?.value || "GMT-05:00";
-    // tz like "GMT-05:00" or "GMT-04:00"
     const m = tz.match(/GMT([+-])(\d{2}):?(\d{2})?/);
     if(!m) return -300;
     const sign = m[1] === "-" ? -1 : 1;
@@ -357,20 +439,18 @@
   }
 
   function parseEtLocalToUtc(etLocal){
-    // etLocal: "YYYY-MM-DDTHH:MM:SS" interpreted as America/New_York local time
     const m = etLocal.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/);
     if(!m) throw new Error("Bad REVEAL_AT_ET format. Use YYYY-MM-DDTHH:MM:SS");
     const [_, Y, Mo, D, H, Mi, S] = m;
     const guessUtc = new Date(Date.UTC(+Y, +Mo-1, +D, +H, +Mi, +(S||0)));
     const offsetMin = getEtOffsetMinutesFor(guessUtc);
-    // local ET = UTC + offset  => UTC = local - offset
     const utcMs = Date.UTC(+Y, +Mo-1, +D, +H, +Mi, +(S||0)) - (offsetMin * 60 * 1000);
     return new Date(utcMs);
   }
 
   function formatEtNice(etLocal){
     const revealUtc = parseEtLocalToUtc(etLocal);
-    const s = new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat("en-US", {
       timeZone: "America/New_York",
       weekday:"long",
       month:"long",
@@ -379,21 +459,27 @@
       hour:"numeric",
       minute:"2-digit"
     }).format(revealUtc);
-    return s;
   }
 
   /* ===== Data ===== */
-  let picks = [];          // raw picks
-  let players = [];        // {name,email,begin,wild}
-  let oddsRows = [];       // raw odds rows
-  let oddsMap = {};        // label -> {odds}
-  let playerStartMoney = {};   // name -> bankroll for this round (Wild Card or Begin)
-  let betsByPlayer = {};       // name -> [{label,wager,odds}]
-  const winners = new Set();   // labels of winning sides
+  let picks = [];
+  let players = [];
+  let oddsRows = [];
+
+  let oddsMap = {};              // label -> {odds}
+  let playerStartMoney = {};     // name -> bankroll for this round
+  let betsByPlayer = {};         // name -> [{label,wager,odds}]
+  let lockedWinners = new Set(); // winner labels loaded from sheet
+  let pendingByGame = {};        // gameKey -> { su:"", spread:"", ou:"" } (local selections)
+
+  function cacheBust(url){
+    const sep = url.includes("?") ? "&" : "?";
+    return url + sep + "t=" + Date.now();
+  }
 
   function loadCSV(url){
     return new Promise((resolve,reject)=>{
-      Papa.parse(url,{
+      Papa.parse(cacheBust(url),{
         download:true,
         header:true,
         dynamicTyping:true,
@@ -402,6 +488,16 @@
         error:err=>reject(err)
       });
     });
+  }
+
+  function getGameKey(row){
+    // Must match the Apps Script matching logic
+    return [
+      String(row[COLS.date] ?? "").trim(),
+      String(row[COLS.time] ?? "").trim(),
+      String(row[COLS.away] ?? "").trim(),
+      String(row[COLS.home] ?? "").trim()
+    ].join(" | ");
   }
 
   function buildOddsMap(){
@@ -430,6 +526,26 @@
     });
   }
 
+  function loadLockedWinnersFromOddsSheet(){
+    lockedWinners = new Set();
+    pendingByGame = {};
+
+    oddsRows.forEach(row=>{
+      if(!(row[COLS.away] && row[COLS.home])) return;
+      const key = getGameKey(row);
+
+      const su = String(row[COLS.suWinner] ?? "").trim();
+      const sp = String(row[COLS.spreadWinner] ?? "").trim();
+      const ou = String(row[COLS.ouWinner] ?? "").trim();
+
+      pendingByGame[key] = { su:"", spread:"", ou:"" };
+
+      if (su) lockedWinners.add(su);
+      if (sp) lockedWinners.add(sp);
+      if (ou) lockedWinners.add(ou);
+    });
+  }
+
   function prepPlayers(){
     players = players.filter(p => p["Player"]);
     players = players.map(p=>({
@@ -446,7 +562,6 @@
   }
 
   function prepPicks(){
-    // keep only this week (if a week filter is set)
     picks = picks.filter(p=>{
       if (!WEEK_FILTER) return true;
       return String(p.Week || "").trim() === WEEK_FILTER;
@@ -460,11 +575,7 @@
       const wager = Number(p.Wager || 0);
       const oddsObj = oddsMap[label] || {odds:0};
       if (!betsByPlayer[name]) betsByPlayer[name] = [];
-      betsByPlayer[name].push({
-        label,
-        wager,
-        odds: oddsObj.odds
-      });
+      betsByPlayer[name].push({ label, wager, odds: oddsObj.odds });
     });
   }
 
@@ -481,40 +592,69 @@
     return map;
   }
 
-  // List ONLY the picks (people + wager)
   function buildBettorsListHTML(bets){
     if (!bets || !bets.length) {
       return `<div class="list"><div class="item"><span class="who">No bets</span><span class="amt"></span></div></div>`;
     }
-    const items = bets
-      .map(b=>`
+    return `<div class="list">${
+      bets.map(b=>`
         <div class="item">
           <span class="who"><span class="name">${b.Name}</span></span>
           <span class="amt">(${fmtMoney(b.Wager)})</span>
         </div>
-      `)
-      .join("");
-    return `<div class="list">${items}</div>`;
+      `).join("")
+    }</div>`;
   }
 
-  function registerWinnerToggle(pillEl, otherPill){
+  function setAdminStatus(msg, kind=""){
+    const el = document.getElementById("adminStatus");
+    el.textContent = msg || "";
+    el.className = "adminStatus" + (kind ? " " + kind : "");
+  }
+
+  function registerWinnerToggle({pillEl, otherPill, gameKey, market, locked}){
     const label = pillEl.dataset.label;
+    if (locked){
+      pillEl.classList.add("disabled");
+      return;
+    }
+
     pillEl.addEventListener("click", ()=>{
       const isActive = pillEl.classList.contains("active");
+
+      // clear status line when clicking
+      setAdminStatus("");
+
       if (isActive){
         pillEl.classList.remove("active");
-        winners.delete(label);
-      }else{
+        pendingByGame[gameKey][market] = "";
+      } else {
         pillEl.classList.add("active");
-        winners.add(label);
+        pendingByGame[gameKey][market] = label;
+
         if (otherPill){
-          const otherLabel = otherPill.dataset.label;
           otherPill.classList.remove("active");
-          winners.delete(otherLabel);
         }
       }
       recalcStandings();
     });
+  }
+
+  function applyLockedWinnerVisual(leftPill, rightPill, winnerLabel){
+    if (!winnerLabel) return;
+    const leftLabel  = leftPill.dataset.label;
+    const rightLabel = rightPill.dataset.label;
+
+    if (winnerLabel === leftLabel){
+      leftPill.classList.add("active");
+      rightPill.classList.remove("active");
+    } else if (winnerLabel === rightLabel){
+      rightPill.classList.add("active");
+      leftPill.classList.remove("active");
+    }
+
+    leftPill.classList.add("disabled");
+    rightPill.classList.add("disabled");
   }
 
   function buildGameCard(row, pickMap){
@@ -532,23 +672,24 @@
     head.append(teams, when);
     game.appendChild(head);
 
+    const gameKey = getGameKey(row);
+
     let anyRowShown = false;
 
-    function makeRow(label, leftLabel, leftOdds, rightLabel, rightOdds){
-      const leftKey  = leftLabel;
-      const rightKey = rightLabel;
-
-      const leftBets  = pickMap.get(leftKey)  || [];
-      const rightBets = pickMap.get(rightKey) || [];
+    function makeRow({label, market, leftLabel, leftOdds, rightLabel, rightOdds, lockedWinnerLabel}){
+      const leftBets  = pickMap.get(leftLabel)  || [];
+      const rightBets = pickMap.get(rightLabel) || [];
 
       if (leftBets.length === 0 && rightBets.length === 0){
-        return; // no bets—skip this row
+        return;
       }
       anyRowShown = true;
 
       const lab = document.createElement("div");
       lab.className = "rowlabel";
-      lab.textContent = label;
+      lab.innerHTML = `<span>${label}</span>${
+        lockedWinnerLabel ? `<span class="lockedTag"><b>LOCKED</b> • winner saved</span>` : ``
+      }`;
       game.appendChild(lab);
 
       const r = document.createElement("div");
@@ -564,14 +705,25 @@
       rightPill.dataset.label = rightLabel;
       rightPill.innerHTML = `<span class="name">${rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
 
-      // winner toggle
-      registerWinnerToggle(leftPill, rightPill);
-      registerWinnerToggle(rightPill, leftPill);
+      const locked = !!lockedWinnerLabel;
+
+      // if locked in sheet, apply and disable
+      if (locked){
+        applyLockedWinnerVisual(leftPill, rightPill, lockedWinnerLabel);
+      } else {
+        // otherwise allow local selection (pending)
+        registerWinnerToggle({pillEl:leftPill, otherPill:rightPill, gameKey, market, locked:false});
+        registerWinnerToggle({pillEl:rightPill, otherPill:leftPill, gameKey, market, locked:false});
+
+        // restore any pending selection for this market
+        const pending = pendingByGame?.[gameKey]?.[market] || "";
+        if (pending === leftLabel) leftPill.classList.add("active");
+        if (pending === rightLabel) rightPill.classList.add("active");
+      }
 
       r.append(leftPill, rightPill);
       game.appendChild(r);
 
-      // bettors underneath corresponding pill; ONLY list picks
       const b = document.createElement("div");
       b.className = "bettors";
       b.innerHTML = `
@@ -582,25 +734,31 @@
     }
 
     // Moneyline
-    makeRow(
-      "Moneyline",
-      row[COLS.away], row[COLS.aSu],
-      row[COLS.home], row[COLS.hSu]
-    );
+    makeRow({
+      label:"Moneyline",
+      market:"su",
+      leftLabel: row[COLS.away], leftOdds: row[COLS.aSu],
+      rightLabel: row[COLS.home], rightOdds: row[COLS.hSu],
+      lockedWinnerLabel: String(row[COLS.suWinner] ?? "").trim()
+    });
 
     // Spread
-    makeRow(
-      "Spread",
-      `${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, row[COLS.aSpreadLine],
-      `${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, row[COLS.hSpreadLine]
-    );
+    makeRow({
+      label:"Spread",
+      market:"spread",
+      leftLabel: `${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, leftOdds: row[COLS.aSpreadLine],
+      rightLabel:`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, rightOdds: row[COLS.hSpreadLine],
+      lockedWinnerLabel: String(row[COLS.spreadWinner] ?? "").trim()
+    });
 
     // Totals
-    makeRow(
-      "Total (O/U)",
-      `Over ${row[COLS.ouTotal]}`, row[COLS.oLine],
-      `Under ${row[COLS.ouTotal]}`, row[COLS.uLine]
-    );
+    makeRow({
+      label:"Total (O/U)",
+      market:"ou",
+      leftLabel: `Over ${row[COLS.ouTotal]}`, leftOdds: row[COLS.oLine],
+      rightLabel:`Under ${row[COLS.ouTotal]}`, rightOdds: row[COLS.uLine],
+      lockedWinnerLabel: String(row[COLS.ouWinner] ?? "").trim()
+    });
 
     if (!anyRowShown){
       const nb = document.createElement("div");
@@ -620,8 +778,7 @@
     gamesEl.innerHTML = "";
     oddsRows.forEach(row=>{
       if (!(row[COLS.away] && row[COLS.home])) return;
-      const card = buildGameCard(row, pickMap);
-      gamesEl.appendChild(card);
+      gamesEl.appendChild(buildGameCard(row, pickMap));
     });
 
     gamesStatus.textContent = "";
@@ -631,6 +788,18 @@
     const tbody = document.querySelector("#standingsTable tbody");
     const table = document.getElementById("standingsTable");
     const statusEl = document.getElementById("standingsStatus");
+
+    // winners used for standings:
+    // - locked winners from sheet ALWAYS count
+    // - plus any pending selections (preview) for markets not yet locked
+    const previewWinners = new Set([...lockedWinners]);
+    Object.keys(pendingByGame).forEach(k=>{
+      const p = pendingByGame[k] || {};
+      ["su","spread","ou"].forEach(m=>{
+        const v = (p[m] || "").trim();
+        if (v) previewWinners.add(v);
+      });
+    });
 
     const rows = [];
 
@@ -644,15 +813,12 @@
 
       let winnings = 0;
       bets.forEach(b=>{
-        if (winners.has(b.label)){
-          const payout = computePayout(b.wager, b.odds);
-          winnings += payout; // stake + profit
+        if (previewWinners.has(b.label)){
+          winnings += computePayout(b.wager, b.odds);
         }
       });
 
-      const totalMoney = currentMoney + winnings;
-
-      rows.push({name,currentMoney,winnings,totalMoney});
+      rows.push({name,currentMoney,winnings,totalMoney: currentMoney + winnings});
     });
 
     rows.sort((a,b)=>b.totalMoney - a.totalMoney);
@@ -672,6 +838,120 @@
 
     table.style.display = "table";
     statusEl.textContent = "";
+  }
+
+  /* ===== Admin: push winners into Odds sheet via Apps Script (JSONP) ===== */
+  function encodePayload(obj){
+    const json = JSON.stringify(obj);
+    // base64 (url-safe enough for encodeURIComponent)
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  function jsonp(url){
+    return new Promise((resolve,reject)=>{
+      const cbName = "__gasCb_" + Math.random().toString(16).slice(2);
+      const script = document.createElement("script");
+      window[cbName] = (data)=>{
+        resolve(data);
+        cleanup();
+      };
+      function cleanup(){
+        try{ delete window[cbName]; }catch(e){ window[cbName]=undefined; }
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+      }
+      script.onerror = ()=>{
+        cleanup();
+        reject(new Error("Failed to reach Apps Script web app (network/deploy issue)."));
+      };
+      script.src = url + (url.includes("?")?"&":"?") + "callback=" + cbName;
+      document.body.appendChild(script);
+    });
+  }
+
+  function buildResultsPayload(){
+    // Only send games where user picked something (pending), and only for markets that are not locked yet
+    const results = [];
+    oddsRows.forEach(row=>{
+      if (!(row[COLS.away] && row[COLS.home])) return;
+
+      const key = getGameKey(row);
+      const pending = pendingByGame[key] || {su:"",spread:"",ou:""};
+
+      const lockedSU = String(row[COLS.suWinner] ?? "").trim();
+      const lockedSP = String(row[COLS.spreadWinner] ?? "").trim();
+      const lockedOU = String(row[COLS.ouWinner] ?? "").trim();
+
+      const su = lockedSU ? "" : (pending.su || "");
+      const spread = lockedSP ? "" : (pending.spread || "");
+      const ou = lockedOU ? "" : (pending.ou || "");
+
+      if (!su && !spread && !ou) return;
+
+      results.push({
+        gameKey: key,
+        date: String(row[COLS.date] ?? "").trim(),
+        time: String(row[COLS.time] ?? "").trim(),
+        away: String(row[COLS.away] ?? "").trim(),
+        home: String(row[COLS.home] ?? "").trim(),
+        suWinner: su,
+        spreadWinner: spread,
+        ouWinner: ou
+      });
+    });
+
+    return { results };
+  }
+
+  async function updateResults(){
+    if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("PASTE_YOUR_WEBAPP_EXEC_URL_HERE")){
+      setAdminStatus("Set GAS_WEBAPP_URL in the HTML first.", "bad");
+      return;
+    }
+
+    const pass = prompt("Admin password:");
+    if (pass === null) return;
+
+    const btn = document.getElementById("btnUpdateResults");
+    btn.disabled = true;
+    setAdminStatus("Updating Odds sheet…", "");
+
+    try{
+      const payloadObj = buildResultsPayload();
+      if (!payloadObj.results.length){
+        setAdminStatus("No new winners selected to save.", "");
+        btn.disabled = false;
+        return;
+      }
+
+      const payload = encodePayload(payloadObj);
+
+      const url =
+        GAS_WEBAPP_URL +
+        (GAS_WEBAPP_URL.includes("?") ? "&" : "?") +
+        "password=" + encodeURIComponent(pass) +
+        "&payload=" + encodeURIComponent(payload) +
+        "&_=" + Date.now(); // bust caches
+
+      const resp = await jsonp(url);
+
+      if (!resp || !resp.ok){
+        setAdminStatus(resp?.error || "Update failed.", "bad");
+        btn.disabled = false;
+        return;
+      }
+
+      setAdminStatus(`Saved: ${resp.updated} cell(s). Refreshing…`, "ok");
+
+      // Reload from sheets so UI locks + standings reflect saved results
+      await loadAndRender(true);
+
+      setAdminStatus("Results updated and locked from sheet.", "ok");
+    } catch (e){
+      console.error(e);
+      setAdminStatus(e.message || "Update failed (see console).", "bad");
+    } finally{
+      btn.disabled = false;
+    }
   }
 
   /* ===== Reveal gate logic ===== */
@@ -701,11 +981,12 @@
     document.getElementById("realContent").style.display = "block";
   }
 
-  async function loadAndRender(){
+  async function loadAndRender(isReload=false){
     const standingsStatus = document.getElementById("standingsStatus");
     const gamesStatus = document.getElementById("gamesStatus");
+
     try{
-      standingsStatus.textContent = "Loading odds, players, and picks…";
+      standingsStatus.textContent = isReload ? "Refreshing data…" : "Loading odds, players, and picks…";
       gamesStatus.textContent = "Loading games…";
 
       const [oddsData, playersData, picksData] = await Promise.all([
@@ -719,6 +1000,7 @@
       picks    = picksData;
 
       buildOddsMap();
+      loadLockedWinnersFromOddsSheet();
       prepPlayers();
       prepPicks();
 
@@ -745,6 +1027,7 @@
         if (countdownTimer) clearInterval(countdownTimer);
         showContent();
         await loadAndRender();
+        document.getElementById("btnUpdateResults").addEventListener("click", updateResults);
         return;
       }
 
@@ -752,7 +1035,6 @@
       setCountdown(msLeft);
     };
 
-    // run immediately and then every second
     tick();
     countdownTimer = setInterval(tick, 1000);
   }
