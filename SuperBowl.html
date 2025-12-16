@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
-<title>Wild Card Lines</title>
+<title>Super Bowl Lines</title>
 <style>
   /* ===== Chicago Bears palette ===== */
   :root{
@@ -163,7 +163,7 @@
         </div>
       </div>
     </div>
-    <h1>Wild Card Lines</h1>
+    <h1>Super Bowl Lines</h1>
     <span class="csBadge">Coming Soon</span>
     <p class="csSub">Lines will be posted here. Check back shortly.</p>
   </div>
@@ -175,7 +175,7 @@
   <header class="topbar">
     <div class="inner">
       <div class="field" style="grid-column:1 / -1">
-        <div class="brand">Wild Card Lines • <em>Pick’em</em></div>
+        <div class="brand">Super Bowl Lines • <em>Pick’em</em></div>
         <div class="totals">
           <span class="chip">Email: <strong id="hdrEmail">—</strong></span>
           <span class="chip">Begin: <strong id="hdrBegin">$0.00</strong></span>
@@ -795,7 +795,7 @@
           players=(res.data||[]).filter(r=>r["Player"]).map(r=>({
             name:r["Player"],
             email:r["Email"]??"",
-            begin:parseMoney(r["Wild Card"])
+            begin:parseMoney(r["Super Bowl"])
           }));
           const sel=$("#playerSelect");
           sel.innerHTML=`<option value="">-- Select --</option>`+
