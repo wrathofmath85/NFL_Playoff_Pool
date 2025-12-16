@@ -136,6 +136,19 @@
     border-top-color:#fff;animation:spin .7s linear infinite;display:none;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
+
+  /* locked banner */
+  .lockBanner{
+    margin:10px 0 0;
+    padding:10px 12px;
+    border:1px solid var(--border);
+    background:color-mix(in srgb, var(--navy-2) 85%, black 15%);
+    border-left:4px solid #ffd18c;
+    border-radius:12px;
+    color:#ffd18c;
+    font-size:.92rem;
+    display:none;
+  }
 </style>
 </head>
 <body>
@@ -171,6 +184,7 @@
           <button id="submitBtn" class="submitBtn">Submit Picks</button>
           <div id="submitSpinner" class="spinner" aria-hidden="true"></div>
         </div>
+        <div id="lockBanner" class="lockBanner"></div>
       </div>
       <div class="field" style="grid-column:1 / -1">
         <label for="playerSelect">Select your name</label>
@@ -206,11 +220,18 @@
   const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
   const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
 
-  // Published CSV (read-only) – kept for reference
+  // Published CSV (read-only) – this is what we ALSO read to block duplicates
   const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
 
   // Apps Script web-app URL that appends to the sheet
   const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
+
+  /* ===== NEW: Deadline (Eastern Time) =====
+     Set this to the cutoff in America/New_York.
+     Format below: "YYYY-MM-DD HH:MM" (24-hour).
+     Example: "2025-12-20 18:00" = Dec 20, 2025 at 6:00 PM ET.
+  */
+  const PICKS_DEADLINE_ET = "2025-12-31 23:59";
 
   /* ===== EmailJS: fill these in ===== */
   const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
@@ -227,6 +248,10 @@
 
   let players = [];
   let currentPlayer = null;
+
+  // NEW: cache of existing picks rows (read from the same published CSV)
+  let existingPickRows = [];
+  let lockReason = ""; // "deadline" | "already_submitted" | ""
 
   /* ===== Helpers ===== */
   const $ = sel => document.querySelector(sel);
@@ -257,6 +282,119 @@
     $("#hdrEmail").textContent     = currentPlayer?.email || "—";
   }
 
+  /* ===== NEW: Timezone-safe(ish) ET deadline handling ===== */
+  function getZonedParts(date, timeZone){
+    const fmt = new Intl.DateTimeFormat("en-US",{
+      timeZone,
+      hour12:false,
+      year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit"
+    });
+    const parts = fmt.formatToParts(date);
+    const out = {};
+    for (const p of parts){
+      if (p.type !== "literal") out[p.type] = p.value;
+    }
+    return {
+      year: Number(out.year),
+      month: Number(out.month),
+      day: Number(out.day),
+      hour: Number(out.hour),
+      minute: Number(out.minute),
+      second: Number(out.second)
+    };
+  }
+
+  // Convert a desired local time in a named tz to a UTC Date (handles DST).
+  function zonedTimeToUtc({timeZone, year, month, day, hour, minute, second=0}){
+    // Start with a naive UTC guess, then compute the offset difference and correct.
+    const guess = new Date(Date.UTC(year, month-1, day, hour, minute, second));
+    const asZoned = getZonedParts(guess, timeZone);
+
+    const guessAsIfZoned = Date.UTC(asZoned.year, asZoned.month-1, asZoned.day, asZoned.hour, asZoned.minute, asZoned.second);
+    const desiredAsZoned = Date.UTC(year, month-1, day, hour, minute, second);
+
+    const diffMs = desiredAsZoned - guessAsIfZoned;
+    return new Date(guess.getTime() + diffMs);
+  }
+
+  function parseDeadlineETToUtcDate(deadlineStr){
+    // "YYYY-MM-DD HH:MM"
+    const m = String(deadlineStr||"").trim().match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+    if(!m) return null;
+    const [,Y,Mo,D,H,Mi] = m;
+    return zonedTimeToUtc({
+      timeZone:"America/New_York",
+      year:Number(Y), month:Number(Mo), day:Number(D),
+      hour:Number(H), minute:Number(Mi), second:0
+    });
+  }
+
+  function isPastDeadline(){
+    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
+    if(!dl) return false; // if malformed, don't block
+    return Date.now() > dl.getTime();
+  }
+
+  function formatDeadlineForDisplay(){
+    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
+    if(!dl) return "";
+    // Display in ET for clarity
+    const fmt = new Intl.DateTimeFormat("en-US",{
+      timeZone:"America/New_York",
+      weekday:"short", month:"short", day:"2-digit", year:"numeric",
+      hour:"numeric", minute:"2-digit"
+    });
+    return fmt.format(dl) + " ET";
+  }
+
+  /* ===== NEW: UI lock/unlock ===== */
+  function setInputsEnabled(enabled){
+    // pills
+    document.querySelectorAll(".pill").forEach(b => b.disabled = !enabled);
+    // wagers
+    document.querySelectorAll("input.wager").forEach(i => i.disabled = !enabled);
+    // submit
+    const btn = $("#submitBtn");
+    if (btn) btn.disabled = !enabled;
+  }
+
+  function showLockBanner(msg){
+    const b = $("#lockBanner");
+    if(!b) return;
+    if(msg){
+      b.textContent = msg;
+      b.style.display = "block";
+    } else {
+      b.textContent = "";
+      b.style.display = "none";
+    }
+  }
+
+  function applyGlobalLocks(){
+    // Deadline lock takes precedence
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      setInputsEnabled(false);
+      showLockBanner(`Picks are CLOSED. Deadline was ${formatDeadlineForDisplay()}.`);
+      return;
+    }
+
+    // If player-specific lock says already submitted, keep locked.
+    if (lockReason === "already_submitted"){
+      setInputsEnabled(false);
+      showLockBanner(`Picks already submitted for ${currentPlayer?.name || "this player"} for ${WEEK_LABEL}.`);
+      return;
+    }
+
+    // Otherwise unlocked (once a player is chosen, we enable interaction)
+    lockReason = "";
+    // If no player selected, keep submit disabled but allow viewing
+    const hasPlayer = !!currentPlayer;
+    setInputsEnabled(hasPlayer);
+    showLockBanner(hasPlayer ? "" : `Select your name to enable picks. Deadline: ${formatDeadlineForDisplay() || "N/A"}.`);
+  }
+
   /* ===== Pill & Row logic ===== */
   function pill(label, odds, gameId, group){
     const el = document.createElement("button");
@@ -268,6 +406,8 @@
     el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
 
     el.addEventListener("click", () => {
+      if (el.disabled) return;
+
       const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
       const wasActive = el.classList.contains("active");
 
@@ -338,6 +478,7 @@
     wagerInput.placeholder = "Wager";
     wagerInput.className = "wager";
     wagerInput.addEventListener("input", () => {
+      if (wagerInput.disabled) return;
       updateRow(r);
     });
     wagerWrap.append(wagerInput);
@@ -402,6 +543,76 @@
       container.appendChild(buildGameRow(r,i));
     });
     refreshHeaderTotals();
+  }
+
+  /* ===== NEW: Load existing picks (for duplicate prevention) ===== */
+  function loadExistingPicks(){
+    return new Promise(resolve=>{
+      Papa.parse(PICKS_SHEET_CSV_URL,{
+        download:true,header:true,dynamicTyping:false,skipEmptyLines:true,
+        complete:res=>{
+          existingPickRows = (res.data||[]).filter(r => Object.keys(r||{}).length);
+          resolve();
+        },
+        error:err=>{
+          console.warn("Could not load existing picks CSV (duplicate checking will be skipped):", err);
+          existingPickRows = [];
+          resolve();
+        }
+      });
+    });
+  }
+
+  function playerHasExistingPicks(player){
+    if (!player) return false;
+
+    const name = String(player.name||"").trim().toLowerCase();
+    const email = String(player.email||"").trim().toLowerCase();
+
+    // We consider "already picked" if ANY row exists for this WEEK_LABEL and same Name (or Email)
+    // and it has a non-empty Pick or Wager.
+    return existingPickRows.some(r=>{
+      const wk = String(r["Week"]||r["WEEK"]||r["week"]||"").trim();
+      if (wk !== WEEK_LABEL) return false;
+
+      const rName  = String(r["Name"]||r["Player"]||"").trim().toLowerCase();
+      const rEmail = String(r["Email"]||"").trim().toLowerCase();
+      const rPick  = String(r["Pick"]||"").trim();
+      const rWager = String(r["Wager"]||"").trim();
+
+      const match = (rName && rName === name) || (email && rEmail && rEmail === email);
+      const hasContent = !!(rPick || rWager);
+      return match && hasContent;
+    });
+  }
+
+  function clearSelections(){
+    document.querySelectorAll(".pill.active").forEach(p=>p.classList.remove("active"));
+    document.querySelectorAll("input.wager").forEach(i=>i.value="");
+    document.querySelectorAll(".payout").forEach(p=>p.textContent="—");
+    document.querySelectorAll(".warn").forEach(w=>w.textContent="");
+    refreshHeaderTotals();
+  }
+
+  function onPlayerChanged(){
+    clearSelections();
+
+    // Deadline check first (global lock)
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      applyGlobalLocks();
+      return;
+    }
+
+    // Duplicate check (player-specific lock)
+    if (currentPlayer && playerHasExistingPicks(currentPlayer)){
+      lockReason = "already_submitted";
+      applyGlobalLocks();
+      return;
+    }
+
+    lockReason = "";
+    applyGlobalLocks();
   }
 
   /* ===== Collect picks for submit ===== */
@@ -495,6 +706,28 @@
 
     statusEl.textContent = "";
 
+    // NEW: enforce deadline
+    if (isPastDeadline()){
+      lockReason = "deadline";
+      applyGlobalLocks();
+      alert(`Picks are closed. Deadline was ${formatDeadlineForDisplay()}.`);
+      return;
+    }
+
+    // NEW: enforce duplicate prevention (re-check right before submit)
+    if (!currentPlayer){
+      alert("Please select your name at the top first.");
+      return;
+    }
+    // Refresh existing picks right before submit to reduce race conditions
+    await loadExistingPicks();
+    if (playerHasExistingPicks(currentPlayer)){
+      lockReason = "already_submitted";
+      applyGlobalLocks();
+      alert(`Picks already submitted for ${currentPlayer.name} for ${WEEK_LABEL}.`);
+      return;
+    }
+
     const picks = collectPicks();
     if (!picks.length){
       alert("Please make at least one pick with a wager.");
@@ -529,17 +762,25 @@
       const text = await resp.text();
       console.log("Submit response:", text);
 
-      // 2) Email via EmailJS (non-blocking for UI, but we await to catch errors)
+      // 2) Email via EmailJS
       await sendEmailWithEmailJS({ picks, totalCommitted });
 
       statusEl.textContent = "Picks submitted and emailed!";
       alert(`Your picks for ${WEEK_LABEL} have been submitted and emailed.`);
+
+      // NEW: after successful submit, refresh + lock immediately
+      await loadExistingPicks();
+      lockReason = "already_submitted";
+      applyGlobalLocks();
     }catch(err){
       console.error(err);
       statusEl.textContent = "Error submitting picks. Check console for details.";
       alert("There was an error submitting your picks. Please try again.");
     }finally{
-      btn.disabled = false;
+      // If we locked due to submit success, keep disabled.
+      if (lockReason !== "already_submitted" && lockReason !== "deadline"){
+        btn.disabled = false;
+      }
       btn.textContent = "Submit Picks";
       if (spinner) spinner.style.display = "none";
     }
@@ -559,12 +800,16 @@
           const sel=$("#playerSelect");
           sel.innerHTML=`<option value="">-- Select --</option>`+
             players.map((p,i)=>`<option value="${i}">${p.name}</option>`).join("");
+
           sel.addEventListener("change",()=>{
-            currentPlayer=players[sel.value]??null;
+            currentPlayer = (sel.value === "" ? null : (players[sel.value] ?? null));
             refreshHeaderTotals();
+            onPlayerChanged();
           });
+
           resolve();
-        }});
+        }
+      });
     });
   }
 
@@ -584,10 +829,17 @@
     }
     document.title = WEEK_LABEL + " Lines";
 
-    await Promise.all([loadPlayers(),loadOdds()]);
+    // NEW: load players, odds, AND existing picks (for duplicate prevention)
+    await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks()]);
 
     const submitBtn = $("#submitBtn");
     if (submitBtn) submitBtn.addEventListener("click", submitPicks);
+
+    // Initial lock state (no player selected yet)
+    applyGlobalLocks();
+
+    // NEW: re-check deadline periodically so it shuts off right on time
+    setInterval(()=>{ applyGlobalLocks(); }, 30 * 1000);
   }
 
   /* ===== Gate controlled by REVEAL_MODE ===== */
