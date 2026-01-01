@@ -226,12 +226,79 @@
   // Apps Script web-app URL that appends to the sheet
   const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
 
-  /* ===== NEW: Deadline (Eastern Time) =====
-     Set this to the cutoff in America/New_York.
-     Format below: "YYYY-MM-DD HH:MM" (24-hour).
-     Example: "2025-12-20 18:00" = Dec 20, 2025 at 6:00 PM ET.
-  */
-  const PICKS_DEADLINE_ET = "2025-12-31 23:59";
+  /* ===== Deadline from CSV (Wild Card row) ===== */
+  const DEADLINES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=1477526617&single=true&output=csv";
+
+  // Will be set on load (UTC Date corresponding to the ET deadline)
+  let picksDeadlineUtc = null;
+
+  function parseMDY(str){
+    // supports M/D/YYYY or MM/DD/YYYY
+    const m = String(str||"").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(!m) return null;
+    return { month:Number(m[1]), day:Number(m[2]), year:Number(m[3]) };
+  }
+
+  function parseTime12h(str){
+    // supports H:MM AM/PM (or HH:MM AM/PM)
+    const m = String(str||"").trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+    if(!m) return null;
+    let hour = Number(m[1]);
+    const minute = Number(m[2]);
+    const ampm = m[3].toUpperCase();
+    if (hour === 12) hour = 0;
+    if (ampm === "PM") hour += 12;
+    return { hour, minute };
+  }
+
+  function deadlineRowToUtc(dateStr, timeStr){
+    const d = parseMDY(dateStr);
+    const t = parseTime12h(timeStr);
+    if(!d || !t) return null;
+
+    // interpret as America/New_York local time (handles DST)
+    return zonedTimeToUtc({
+      timeZone:"America/New_York",
+      year:d.year, month:d.month, day:d.day,
+      hour:t.hour, minute:t.minute, second:0
+    });
+  }
+
+  function loadDeadlineFromCsv(){
+    return new Promise(resolve=>{
+      Papa.parse(DEADLINES_CSV_URL,{
+        download:true, header:true, dynamicTyping:false, skipEmptyLines:true,
+        complete:res=>{
+          const rows = (res.data||[]).filter(r => Object.keys(r||{}).length);
+
+          // Find row where Round matches WEEK_LABEL (e.g., "Wild Card")
+          const target = rows.find(r => String(r["Round"]||"").trim().toLowerCase() === String(WEEK_LABEL).trim().toLowerCase());
+
+          if(!target){
+            console.warn("Deadline CSV: no matching Round row found for", WEEK_LABEL);
+            picksDeadlineUtc = null;
+            return resolve();
+          }
+
+          const dl = deadlineRowToUtc(target["Date"], target["Time"]);
+          if(!dl){
+            console.warn("Deadline CSV: could not parse Date/Time:", target["Date"], target["Time"]);
+            picksDeadlineUtc = null;
+            return resolve();
+          }
+
+          picksDeadlineUtc = dl;
+          resolve();
+        },
+        error:err=>{
+          console.warn("Deadline CSV: failed to load:", err);
+          picksDeadlineUtc = null;
+          resolve();
+        }
+      });
+    });
+  }
+
 
   /* ===== EmailJS: fill these in ===== */
   const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
@@ -331,21 +398,18 @@
   }
 
   function isPastDeadline(){
-    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
-    if(!dl) return false; // if malformed, don't block
-    return Date.now() > dl.getTime();
+    if(!picksDeadlineUtc) return false; // if not loaded, don't block
+    return Date.now() > picksDeadlineUtc.getTime();
   }
 
   function formatDeadlineForDisplay(){
-    const dl = parseDeadlineETToUtcDate(PICKS_DEADLINE_ET);
-    if(!dl) return "";
-    // Display in ET for clarity
+    if(!picksDeadlineUtc) return "";
     const fmt = new Intl.DateTimeFormat("en-US",{
       timeZone:"America/New_York",
       weekday:"short", month:"short", day:"2-digit", year:"numeric",
       hour:"numeric", minute:"2-digit"
     });
-    return fmt.format(dl) + " ET";
+    return fmt.format(picksDeadlineUtc) + " ET";
   }
 
   /* ===== NEW: UI lock/unlock ===== */
@@ -830,7 +894,8 @@
     document.title = WEEK_LABEL + " Lines";
 
     // NEW: load players, odds, AND existing picks (for duplicate prevention)
-    await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks()]);
+    await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks(), loadDeadlineFromCsv()]);
+
 
     const submitBtn = $("#submitBtn");
     if (submitBtn) submitBtn.addEventListener("click", submitPicks);
