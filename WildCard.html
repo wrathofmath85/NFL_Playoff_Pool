@@ -211,8 +211,32 @@
 <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 
 <script>
-  /* ===== Simple gate: set to "comingSoon" or "live" ===== */
-  const REVEAL_MODE = "live"; // change to "comingSoon" to hide the app
+  /* ===== Simple gate: Reveal comes from the Deadlines CSV (Round=WEEK_LABEL, column "Reveal") ===== */
+  let REVEAL_MODE = "comingSoon"; // default closed unless CSV says Yes
+
+  async function loadRevealModeFromCsv(){
+    return new Promise(resolve=>{
+      Papa.parse(DEADLINES_CSV_URL,{
+        download:true, header:true, dynamicTyping:false, skipEmptyLines:true,
+        complete:res=>{
+          const rows = (res.data||[]).filter(r => Object.keys(r||{}).length);
+          const target = rows.find(r =>
+            String(r["Round"]||"").trim().toLowerCase() === String(WEEK_LABEL).trim().toLowerCase()
+          );
+
+          const flag = String(target?.["Reveal"] ?? "").trim().toLowerCase();
+          REVEAL_MODE = (flag === "yes") ? "live" : "comingSoon";
+          resolve();
+        },
+        error:err=>{
+          console.warn("Reveal CSV: failed to load (defaulting to comingSoon):", err);
+          REVEAL_MODE = "comingSoon";
+          resolve();
+        }
+      });
+    });
+  }
+
 
   /* ===== Config / URLs ===== */
   const WEEK_LABEL = "Wild Card"; // header + Week column
@@ -908,10 +932,13 @@
     setInterval(()=>{ applyGlobalLocks(); }, 30 * 1000);
   }
 
-  /* ===== Gate controlled by REVEAL_MODE ===== */
-  function setupGate(){
+  /* ===== Gate controlled by Reveal flag in CSV ===== */
+  async function setupGate(){
     const soon = document.getElementById("comingSoon");
     const app  = document.getElementById("mainApp");
+
+    // Decide live/comingSoon from the Deadlines CSV
+    await loadRevealModeFromCsv();
 
     if (REVEAL_MODE === "live"){
       soon.style.display = "none";
@@ -922,6 +949,7 @@
       app.style.display  = "none";
     }
   }
+
 
   document.addEventListener("DOMContentLoaded", setupGate);
 </script>
