@@ -717,14 +717,22 @@
         const active = row.querySelector(".pill.active");
         const wager = Number(row.querySelector("input.wager").value || 0);
         if (active && wager > 0){
-          const pickLabel = active.querySelector(".name").textContent.trim();
-          picks.push({
-            Week: WEEK_LABEL,
-            Name: currentPlayer.name,
-            Email: currentPlayer.email || "",
-            Pick: pickLabel,
-            Wager: wager
-          });
+          let pickLabel = active.querySelector(".name").textContent.trim();
+
+// If this is a Total (O/U) pick, prefix with the game matchup so emails are clear
+if (group === "total") {
+  const matchup = game.querySelector(".teams")?.textContent?.trim() || "";
+  if (matchup) pickLabel = `${matchup} — ${pickLabel}`;
+}
+
+picks.push({
+  Week: WEEK_LABEL,
+  Name: currentPlayer.name,
+  Email: currentPlayer.email || "",
+  Pick: pickLabel,
+  Wager: wager
+});
+
         }
       });
     });
