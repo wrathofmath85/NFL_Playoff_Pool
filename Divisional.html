@@ -347,7 +347,8 @@
   /* ===== Helpers ===== */
   const $ = sel => document.querySelector(sel);
   const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
-  const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
+const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
+
   const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
   function computePayout(wager, odds){
@@ -465,6 +466,7 @@
       lockReason = "deadline";
       setInputsEnabled(false);
       showLockBanner(`Picks are CLOSED. Deadline was ${formatDeadlineForDisplay()}.`);
+
       return;
     }
 
@@ -472,6 +474,7 @@
     if (lockReason === "already_submitted"){
       setInputsEnabled(false);
       showLockBanner(`Picks already submitted for ${currentPlayer?.name || "this player"} for ${WEEK_LABEL}.`);
+
       return;
     }
 
@@ -481,6 +484,7 @@
     const hasPlayer = !!currentPlayer;
     setInputsEnabled(hasPlayer);
     showLockBanner(hasPlayer ? "" : `Select your name to enable picks. Deadline: ${formatDeadlineForDisplay() || "N/A"}.`);
+
   }
 
   /* ===== Pill & Row logic ===== */
@@ -493,10 +497,12 @@
     el.dataset.odds   = odds ?? "";
     el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
 
+
     el.addEventListener("click", () => {
       if (el.disabled) return;
 
       const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
+
       const wasActive = el.classList.contains("active");
 
       if (wasActive) {
@@ -713,6 +719,7 @@
     document.querySelectorAll(".game").forEach(game => {
       ["ml","spread","total"].forEach(group => {
         const row = game.querySelector(`.row[data-group="${group}"]`);
+
         if (!row) return;
         const active = row.querySelector(".pill.active");
         const wager = Number(row.querySelector("input.wager").value || 0);
