@@ -237,7 +237,6 @@
     });
   }
 
-
   /* ===== Config / URLs ===== */
   const WEEK_LABEL = "Conference"; // header + Week column
 
@@ -249,7 +248,8 @@
 
   // Apps Script web-app URL that appends to the sheet
   const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
-  /* ===== Deadline from CSV (Wild Card row) ===== */
+
+  /* ===== Deadline from CSV (Conference row) ===== */
   const DEADLINES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=1477526617&single=true&output=csv";
 
   // Will be set on load (UTC Date corresponding to the ET deadline)
@@ -294,7 +294,7 @@
         complete:res=>{
           const rows = (res.data||[]).filter(r => Object.keys(r||{}).length);
 
-          // Find row where Round matches WEEK_LABEL (e.g., "Wild Card")
+          // Find row where Round matches WEEK_LABEL (e.g., "Conference")
           const target = rows.find(r => String(r["Round"]||"").trim().toLowerCase() === String(WEEK_LABEL).trim().toLowerCase());
 
           if(!target){
@@ -322,7 +322,6 @@
     });
   }
 
-
   /* ===== EmailJS: fill these in ===== */
   const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
   const EMAILJS_SERVICE_ID = "service_txqdfck";
@@ -339,15 +338,14 @@
   let players = [];
   let currentPlayer = null;
 
-  // NEW: cache of existing picks rows (read from the same published CSV)
+  // cache of existing picks rows (read from the same published CSV)
   let existingPickRows = [];
   let lockReason = ""; // "deadline" | "already_submitted" | ""
 
   /* ===== Helpers ===== */
   const $ = sel => document.querySelector(sel);
   const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
-const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
-
+  const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
   const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
 
   function computePayout(wager, odds){
@@ -373,7 +371,7 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     $("#hdrEmail").textContent     = currentPlayer?.email || "—";
   }
 
-  /* ===== NEW: Timezone-safe(ish) ET deadline handling ===== */
+  /* ===== Timezone-safe(ish) ET deadline handling ===== */
   function getZonedParts(date, timeZone){
     const fmt = new Intl.DateTimeFormat("en-US",{
       timeZone,
@@ -421,7 +419,7 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     });
   }
 
-    function isPastDeadline(){
+  function isPastDeadline(){
     if(!picksDeadlineUtc) return false; // if not loaded, don't block
     return Date.now() > picksDeadlineUtc.getTime();
   }
@@ -436,8 +434,7 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     return fmt.format(picksDeadlineUtc) + " ET";
   }
 
-
-  /* ===== NEW: UI lock/unlock ===== */
+  /* ===== UI lock/unlock ===== */
   function setInputsEnabled(enabled){
     // pills
     document.querySelectorAll(".pill").forEach(b => b.disabled = !enabled);
@@ -466,7 +463,6 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
       lockReason = "deadline";
       setInputsEnabled(false);
       showLockBanner(`Picks are CLOSED. Deadline was ${formatDeadlineForDisplay()}.`);
-
       return;
     }
 
@@ -474,7 +470,6 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     if (lockReason === "already_submitted"){
       setInputsEnabled(false);
       showLockBanner(`Picks already submitted for ${currentPlayer?.name || "this player"} for ${WEEK_LABEL}.`);
-
       return;
     }
 
@@ -484,7 +479,6 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     const hasPlayer = !!currentPlayer;
     setInputsEnabled(hasPlayer);
     showLockBanner(hasPlayer ? "" : `Select your name to enable picks. Deadline: ${formatDeadlineForDisplay() || "N/A"}.`);
-
   }
 
   /* ===== Pill & Row logic ===== */
@@ -497,12 +491,10 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     el.dataset.odds   = odds ?? "";
     el.innerHTML = `<span class="name">${label}</span><span class="odds">${fmtSigned(odds)}</span>`;
 
-
     el.addEventListener("click", () => {
       if (el.disabled) return;
 
-     const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
-
+      const scope = document.querySelector(`.game[data-id="${gameId}"] .row[data-group="${group}"]`);
       const wasActive = el.classList.contains("active");
 
       if (wasActive) {
@@ -597,11 +589,15 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     game.className = "game";
     game.dataset.id = idx;
 
+    // IMPORTANT: store matchup for later so Pick includes game name (for email + CSV)
+    const matchup = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    game.dataset.matchup = matchup;
+
     const head = document.createElement("div");
     head.className = "head";
     const teams = document.createElement("div");
     teams.className = "teams";
-    teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    teams.textContent = matchup;
     const when = document.createElement("div");
     when.className = "when";
     when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
@@ -639,7 +635,7 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
     refreshHeaderTotals();
   }
 
-  /* ===== NEW: Load existing picks (for duplicate prevention) ===== */
+  /* ===== Load existing picks (for duplicate prevention) ===== */
   function loadExistingPicks(){
     return new Promise(resolve=>{
       Papa.parse(PICKS_SHEET_CSV_URL,{
@@ -717,29 +713,23 @@ const fmtMoney  = v => `$${Number(v||0).toFixed(2)}`;
       return picks;
     }
     document.querySelectorAll(".game").forEach(game => {
+      const matchup = (game.dataset.matchup || "").trim(); // e.g., "Packers @ Lions"
       ["ml","spread","total"].forEach(group => {
         const row = game.querySelector(`.row[data-group="${group}"]`);
-
         if (!row) return;
         const active = row.querySelector(".pill.active");
         const wager = Number(row.querySelector("input.wager").value || 0);
         if (active && wager > 0){
-          let pickLabel = active.querySelector(".name").textContent.trim();
+          const pickLabel = active.querySelector(".name").textContent.trim(); // e.g., "Over 45.5"
+          const pickFull = matchup ? `${matchup} ${pickLabel}` : pickLabel;   // "Packers @ Lions Over 45.5"
 
-// If this is a Total (O/U) pick, prefix with the game matchup so emails are clear
-if (group === "total") {
-  const matchup = game.querySelector(".teams")?.textContent?.trim() || "";
-  if (matchup) pickLabel = `${matchup} — ${pickLabel}`;
-}
-
-picks.push({
-  Week: WEEK_LABEL,
-  Name: currentPlayer.name,
-  Email: currentPlayer.email || "",
-  Pick: pickLabel,
-  Wager: wager
-});
-
+          picks.push({
+            Week: WEEK_LABEL,
+            Name: currentPlayer.name,
+            Email: currentPlayer.email || "",
+            Pick: pickFull,
+            Wager: wager
+          });
         }
       });
     });
@@ -797,7 +787,7 @@ picks.push({
       console.log("EmailJS sent:", res.status, res.text);
     }catch(err){
       console.error("EmailJS error:", err);
-      // Non-blocking: we won't alert here, since picks already submitted to the sheet
+      // Non-blocking
     }
   }
 
@@ -809,7 +799,7 @@ picks.push({
 
     statusEl.textContent = "";
 
-    // NEW: enforce deadline
+    // enforce deadline
     if (isPastDeadline()){
       lockReason = "deadline";
       applyGlobalLocks();
@@ -817,12 +807,11 @@ picks.push({
       return;
     }
 
-    // NEW: enforce duplicate prevention (re-check right before submit)
+    // enforce duplicate prevention (re-check right before submit)
     if (!currentPlayer){
       alert("Please select your name at the top first.");
       return;
     }
-    // Refresh existing picks right before submit to reduce race conditions
     await loadExistingPicks();
     if (playerHasExistingPicks(currentPlayer)){
       lockReason = "already_submitted";
@@ -842,7 +831,6 @@ picks.push({
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
       console.log("Picks that would be submitted to the sheet:", picks);
       alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
-      // Even if sheet submit is not configured, we can still email:
       await sendEmailWithEmailJS({ picks, totalCommitted });
       statusEl.textContent = "Picks emailed (sheet submit not configured).";
       return;
@@ -871,7 +859,7 @@ picks.push({
       statusEl.textContent = "Picks submitted and emailed!";
       alert(`Your picks for ${WEEK_LABEL} have been submitted and emailed.`);
 
-      // NEW: after successful submit, refresh + lock immediately
+      // after successful submit, refresh + lock immediately
       await loadExistingPicks();
       lockReason = "already_submitted";
       applyGlobalLocks();
@@ -880,7 +868,6 @@ picks.push({
       statusEl.textContent = "Error submitting picks. Check console for details.";
       alert("There was an error submitting your picks. Please try again.");
     }finally{
-      // If we locked due to submit success, keep disabled.
       if (lockReason !== "already_submitted" && lockReason !== "deadline"){
         btn.disabled = false;
       }
@@ -932,9 +919,7 @@ picks.push({
     }
     document.title = WEEK_LABEL + " Lines";
 
-    // NEW: load players, odds, AND existing picks (for duplicate prevention)
-      await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks(), loadDeadlineFromCsv()]);
-
+    await Promise.all([loadPlayers(), loadOdds(), loadExistingPicks(), loadDeadlineFromCsv()]);
 
     const submitBtn = $("#submitBtn");
     if (submitBtn) submitBtn.addEventListener("click", submitPicks);
@@ -942,7 +927,7 @@ picks.push({
     // Initial lock state (no player selected yet)
     applyGlobalLocks();
 
-    // NEW: re-check deadline periodically so it shuts off right on time
+    // re-check deadline periodically
     setInterval(()=>{ applyGlobalLocks(); }, 30 * 1000);
   }
 
@@ -963,7 +948,6 @@ picks.push({
       app.style.display  = "none";
     }
   }
-
 
   document.addEventListener("DOMContentLoaded", setupGate);
 </script>
