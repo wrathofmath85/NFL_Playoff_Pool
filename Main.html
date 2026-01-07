@@ -4,6 +4,10 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Playoff Pick'em Hub</title>
+
+  <!-- CSV parser (robust + easy) -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
   <style>
     /* ===== Chicago Bears palette ===== */
     :root{
@@ -149,6 +153,8 @@
       justify-content:space-between;
       align-items:center;
       margin-bottom:10px;
+      gap:10px;
+      flex-wrap:wrap;
     }
     .cardTitle{
       font-size:1.05rem;
@@ -218,6 +224,58 @@
       line-height:1;
     }
 
+    /* ===== Historical Winners ===== */
+    .winnersWrap{
+      margin-top:18px;
+    }
+    .winnersNote{
+      margin:0;
+      font-size:.84rem;
+      color:var(--muted);
+    }
+    .tableShell{
+      margin-top:10px;
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+      background:rgba(3,8,20,.6);
+    }
+    table{
+      width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      font-size:.9rem;
+    }
+    thead th{
+      text-align:left;
+      font-size:.78rem;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+      color:var(--muted);
+      background:rgba(9,18,40,.9);
+      border-bottom:1px solid var(--border);
+      padding:10px 12px;
+      white-space:nowrap;
+    }
+    tbody td{
+      padding:10px 12px;
+      border-bottom:1px solid rgba(39,56,94,.6);
+      vertical-align:top;
+    }
+    tbody tr:last-child td{border-bottom:none;}
+    .num{ text-align:right; font-variant-numeric:tabular-nums; }
+    .muted{ color:var(--muted); }
+    .pill{
+      display:inline-block;
+      padding:4px 10px;
+      border-radius:999px;
+      border:1px solid rgba(255,255,255,.18);
+      background:rgba(3,8,20,.65);
+      color:var(--text);
+      font-size:.82rem;
+      white-space:nowrap;
+    }
+
     footer{
       margin-top:26px;
       font-size:.78rem;
@@ -255,12 +313,10 @@
         <div class="cardBody">
           <p>View the Wild Card lines or check everyone’s picks and standings.</p>
           <div class="linkRow">
-            <!-- TODO: replace # with your Wild Card lines URL -->
             <a class="btnLink btnPrimary" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/WildCard">
               <span class="btnIcon">🏈</span>
               <span>Lines / Make Picks</span>
             </a>
-            <!-- TODO: replace # with your Wild Card picks/summary URL -->
             <a class="btnLink btnGhost" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/WildCardPicks">
               <span class="btnIcon">📊</span>
               <span>Picks & Standings</span>
@@ -278,12 +334,10 @@
         <div class="cardBody">
           <p>Lines and group picks for the Divisional round once it opens.</p>
           <div class="linkRow">
-            <!-- TODO: replace # with your Divisional lines URL -->
             <a class="btnLink btnPrimary" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/Divisional">
               <span class="btnIcon">🏈</span>
               <span>Lines / Make Picks</span>
             </a>
-            <!-- TODO: replace # with your Divisional picks/summary URL -->
             <a class="btnLink btnGhost" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/DivisionalPicks">
               <span class="btnIcon">📊</span>
               <span>Picks & Standings</span>
@@ -301,12 +355,10 @@
         <div class="cardBody">
           <p>Track who’s still alive heading into Championship Sunday.</p>
           <div class="linkRow">
-            <!-- TODO: replace # with your Conference lines URL -->
             <a class="btnLink btnPrimary" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/Conference">
               <span class="btnIcon">🏈</span>
               <span>Lines / Make Picks</span>
             </a>
-            <!-- TODO: replace # with your Conference picks/summary URL -->
             <a class="btnLink btnGhost" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/ConferencePicks">
               <span class="btnIcon">📊</span>
               <span>Picks & Standings</span>
@@ -324,12 +376,10 @@
         <div class="cardBody">
           <p>The final round: big game lines and the last round of picks.</p>
           <div class="linkRow">
-            <!-- TODO: replace # with your Super Bowl lines URL -->
             <a class="btnLink btnPrimary" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/SuperBowl">
               <span class="btnIcon">🏈</span>
               <span>Lines / Make Picks</span>
             </a>
-            <!-- TODO: replace # with your Super Bowl picks/summary URL -->
             <a class="btnLink btnGhost" href="https://wrathofmath85.github.io/NFL_Playoff_Pool/SuperBowlPicks">
               <span class="btnIcon">📊</span>
               <span>Picks & Standings</span>
@@ -339,9 +389,125 @@
       </section>
     </main>
 
+    <!-- ===== Historical Winners (NEW) ===== -->
+    <section class="card winnersWrap" aria-labelledby="histWinnersTitle">
+      <div class="cardHeader">
+        <div class="cardTitle" id="histWinnersTitle"><span>Historical</span> Winners</div>
+        <div class="roundTag">All Years</div>
+      </div>
+      <div class="cardBody">
+        <p class="winnersNote">
+          Past champs and payouts (pulled live from your Google Sheet CSV).
+          <span class="pill" id="winnersStatus">Loading…</span>
+        </p>
+
+        <div class="tableShell" role="region" aria-label="Historical winners table">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:110px;">Year</th>
+                <th>Champ</th>
+                <th class="num" style="width:170px;">Won with</th>
+              </tr>
+            </thead>
+            <tbody id="winnersBody">
+              <tr>
+                <td colspan="3" class="muted">Loading…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
     <footer>
       GitHub Pages • Playoff Pick’em
     </footer>
   </div>
+
+  <script>
+    // ===== CONFIG: Historical winners CSV =====
+    const WINNERS_CSV_URL =
+      "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=1357054139&single=true&output=csv";
+
+    const winnersBody   = document.getElementById("winnersBody");
+    const winnersStatus = document.getElementById("winnersStatus");
+
+    function setStatus(text, ok=true){
+      winnersStatus.textContent = text;
+      winnersStatus.style.borderColor = ok ? "rgba(255,255,255,.18)" : "rgba(220,68,5,.7)";
+      winnersStatus.style.color = ok ? "var(--text)" : "var(--orange)";
+    }
+
+    function esc(s){
+      return String(s ?? "").replace(/[&<>"']/g, c => ({
+        "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"
+      }[c]));
+    }
+
+    function normalizeKey(k){
+      return String(k || "")
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, "");
+    }
+
+    function renderWinners(rows){
+      // Expect columns: Year, Champ, Won with
+      // But be tolerant about header naming/casing/spacing
+      const mapped = rows
+        .map(r => {
+          const keys = Object.keys(r || {});
+          const get = (want) => {
+            const w = normalizeKey(want);
+            const hit = keys.find(k => normalizeKey(k) === w);
+            return hit ? r[hit] : "";
+          };
+          const year = get("Year");
+          const champ = get("Champ");
+          const wonWith = get("Won with") || get("WonWith") || get("Won");
+          return { year, champ, wonWith };
+        })
+        .filter(x => String(x.year).trim() !== "" || String(x.champ).trim() !== "" || String(x.wonWith).trim() !== "");
+
+      // Sort by Year desc if numeric
+      mapped.sort((a,b) => (parseInt(b.year,10) || 0) - (parseInt(a.year,10) || 0));
+
+      if (!mapped.length){
+        winnersBody.innerHTML = `<tr><td colspan="3" class="muted">No winner rows found in the CSV.</td></tr>`;
+        setStatus("No data", false);
+        return;
+      }
+
+      winnersBody.innerHTML = mapped.map(x => `
+        <tr>
+          <td>${esc(x.year)}</td>
+          <td>${esc(x.champ)}</td>
+          <td class="num">${esc(x.wonWith)}</td>
+        </tr>
+      `).join("");
+
+      setStatus("Updated ✓", true);
+    }
+
+    function loadWinners(){
+      setStatus("Loading…", true);
+      Papa.parse(WINNERS_CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          const data = results && results.data ? results.data : [];
+          renderWinners(data);
+        },
+        error: () => {
+          winnersBody.innerHTML = `<tr><td colspan="3" class="muted">Couldn’t load the winners CSV.</td></tr>`;
+          setStatus("Load failed", false);
+        }
+      });
+    }
+
+    loadWinners();
+  </script>
 </body>
 </html>
