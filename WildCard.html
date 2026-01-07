@@ -207,8 +207,8 @@
 
 <!-- PapaParse -->
 <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
-<!-- EmailJS SDK -->
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<!-- Email is sent by Apps Script (no EmailJS to avoid CORS) -->
+
 
 <script>
   /* ===== Simple gate: Reveal comes from the Deadlines CSV (Round=WEEK_LABEL, column "Reveal") ===== */
@@ -247,7 +247,7 @@
   const PICKS_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
 
   // Apps Script web-app URL that appends to the sheet
-  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbxnDlYdKJZ8PkWYQlniFRDCp4UTrUjbMcapFbeu6Njjblu2ocdwJaN3EJTsXVh5yKSnYA/exec";
+  const SUBMIT_ENDPOINT = "https://script.google.com/macros/s/AKfycbzLh2RUUuDFUm7-M82uFlCTltARudUmIo94i9YY-YeAQzLEEVzsAY-kO69HRWZlXWUxpw/exec";
 
   /* ===== Deadline from CSV (Wild Card row) ===== */
   const DEADLINES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=1477526617&single=true&output=csv";
@@ -322,10 +322,8 @@
     });
   }
 
-  /* ===== EmailJS: fill these in ===== */
-  const EMAILJS_PUBLIC_KEY = "YB5J-75APa-V6Giku";
-  const EMAILJS_SERVICE_ID = "service_txqdfck";
-  const EMAILJS_TEMPLATE_ID = "template_7v0wu4t";
+  /* ===== Email is sent by Apps Script (no EmailJS to avoid CORS) ===== */
+
 
   /* ===== Odds sheet columns ===== */
   const COLS = {
@@ -761,35 +759,9 @@
       </table>`;
   }
 
-  async function sendEmailWithEmailJS({ picks, totalCommitted }){
-    if (!EMAILJS_PUBLIC_KEY || EMAILJS_PUBLIC_KEY === "YOUR_PUBLIC_KEY") {
-      console.warn("EmailJS is not configured; skipping email.");
-      return;
-    }
-    emailjs.init(EMAILJS_PUBLIC_KEY);
+  // Email is handled by Apps Script now (server-side), so nothing to do here.
+  async function sendEmailWithEmailJS(){ return; }
 
-    const playerEmail = currentPlayer?.email?.trim() || "";
-    // Send to the player (if we have an email) AND your admin address
-    const to_email = [playerEmail, "wrathofmath85@gmail.com"].filter(Boolean).join(",");
-
-    const templateParams = {
-      to_email,
-      week: WEEK_LABEL,
-      user_name: currentPlayer?.name || "Unknown",
-      user_email: playerEmail || "N/A",
-      total_committed: `$${Number(totalCommitted).toFixed(2)}`,
-      picks_text: picksToText(picks),
-      picks_html: picksToHTML(picks)
-    };
-
-    try{
-      const res = await emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams);
-      console.log("EmailJS sent:", res.status, res.text);
-    }catch(err){
-      console.error("EmailJS error:", err);
-      // Non-blocking
-    }
-  }
 
   /* ===== Submit flow ===== */
   async function submitPicks(){
@@ -831,7 +803,8 @@
     if (!SUBMIT_ENDPOINT || SUBMIT_ENDPOINT.startsWith("REPLACE_")){
       console.log("Picks that would be submitted to the sheet:", picks);
       alert("Submit endpoint is not configured yet. Picks have been logged to the browser console.");
-      await sendEmailWithEmailJS({ picks, totalCommitted });
+            // Email is sent by Apps Script (server-side)
+
       statusEl.textContent = "Picks emailed (sheet submit not configured).";
       return;
     }
@@ -846,17 +819,25 @@
       params.append("data", JSON.stringify({
         rows: picks,
         week: WEEK_LABEL,
-        targetCsv: PICKS_SHEET_CSV_URL
+
+        // Include email content so Apps Script can send it without EmailJS
+        email: {
+          toPlayer: (currentPlayer?.email || ""),
+          playerName: (currentPlayer?.name || ""),
+          totalCommitted: Number(totalCommitted || 0),
+          picks_text: picksToText(picks),
+          picks_html: picksToHTML(picks)
+        }
       }));
+
 
       const resp = await fetch(SUBMIT_ENDPOINT, { method: "POST", body: params });
       const text = await resp.text();
       console.log("Submit response:", text);
 
       // 2) Email via EmailJS
-      await sendEmailWithEmailJS({ picks, totalCommitted });
+      statusEl.textContent = "Submit endpoint not configured (no email sent).";
 
-      statusEl.textContent = "Picks submitted and emailed!";
       alert(`Your picks for ${WEEK_LABEL} have been submitted and emailed.`);
 
       // after successful submit, refresh + lock immediately
