@@ -584,6 +584,27 @@
     return { overNew, underNew, overOld, underOld, total, prefix };
   }
 
+// NEW: Normalize how picks are stored in the Picks CSV.
+// CSV now stores S/U + Spread as: "Away @ Home <pick>"
+// We need to match oddsMap keys which are: "<team>" or "<team> (+/-X.X)"
+// Totals (O/U) should stay game-specific ("Away @ Home Over 46.5").
+function normalizePickLabel(raw){
+  const s = String(raw || "").trim();
+  if (!s) return "";
+
+  // If it's already an O/U label (new style), keep it as-is
+  if (/\s(Over|Under)\s/i.test(s)) return s;
+
+  // If it looks like "Away @ Home Something", strip the matchup prefix
+  // Example: "Rams @ Panthers Rams" -> "Rams"
+  // Example: "Rams @ Panthers Panthers (+9.5)" -> "Panthers (+9.5)"
+  const m = s.match(/^(.+?)\s*@\s*(.+?)\s+(.+)$/);
+  if (m && m[3]) return m[3].trim();
+
+  return s;
+}
+
+
   function buildOddsMap(){
     oddsMap = {};
     oddsRows.forEach(row=>{
@@ -657,7 +678,8 @@
       const name = p.Name;
       if (!name) return;
 
-      const label = String(p.Pick || "").trim();
+const label = normalizePickLabel(p.Pick);
+
       const wager = Number(p.Wager || 0);
 
       // Odds lookup now supports:
@@ -678,7 +700,8 @@
       const week = p.Week || "";
       if (WEEK_FILTER && String(week) !== WEEK_FILTER) return;
 
-      const key = String(p.Pick || "").trim();
+      const key = normalizePickLabel(p.Pick);
+
       if (!key) return;
 
       if (!map.has(key)) map.set(key, []);
