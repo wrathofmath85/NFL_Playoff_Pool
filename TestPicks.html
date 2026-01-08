@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Wild Card Picks – Summary & Standings</title>
+<style>
+  /* ===== Chicago Bears palette ===== */
+  :root{
+    --navy:#0B162A;
+    --navy-2:#101b33;
+    --navy-3:#0e1424;
+    --orange:#DC4405;
+    --muted:#a9b5c7;
+    --border:#27385e;
+    --text:#eef3ff;
+    --danger:#ff9b9b;
+    --ok:#9bffbf;
+  }
+
+  html,body{
+    margin:0;
+    background:var(--navy);
+    color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial,sans-serif;
+  }
+  .wrap{
+    max-width:1100px;
+    margin:auto;
+    padding:16px 22px 28px;
+  }
+
+  h1{margin:10px 0 4px;}
+  h2{margin:16px 0 6px;}
+  .hint{color:var(--muted);margin:0 0 10px;font-size:.9rem;}
+
+  .loading, .error{
+    color:var(--muted);
+    font-size:.9rem;
+  }
+  .error{color:var(--danger);}
+
+  /* ===== Reveal gate ===== */
+  .gate{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:22px 18px;
+    margin:14px 0;
+    text-align:center;
+  }
+  .gate h2{margin:0 0 8px;}
+  .gate .sub{color:var(--muted);margin:0 0 14px;font-size:.95rem;}
+  .countdown{
+    display:inline-flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:center;
+    margin-top:4px;
+  }
+  .cdBox{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:12px;
+    padding:10px 12px;
+    min-width:84px;
+  }
+  .cdNum{
+    font-size:1.35rem;
+    font-weight:800;
+    color:var(--orange);
+    line-height:1.1;
+  }
+  .cdLbl{
+    font-size:.75rem;
+    color:var(--muted);
+    letter-spacing:.05em;
+    text-transform:uppercase;
+    margin-top:4px;
+  }
+
+  /* ===== Standings table ===== */
+  table{
+    border-collapse:collapse;
+    width:100%;
+    margin-bottom:18px;
+    font-size:.9rem;
+  }
+  th,td{
+    padding:8px 10px;
+    border-bottom:1px solid var(--border);
+    text-align:right;
+  }
+  th:nth-child(2), td:nth-child(2){text-align:left;}
+  th{
+    background:var(--navy-2);
+    color:var(--muted);
+    font-weight:600;
+    font-size:.82rem;
+    text-transform:uppercase;
+    letter-spacing:.04em;
+  }
+  tr:nth-child(even) td{
+    background:rgba(255,255,255,0.01);
+  }
+
+  /* ===== Game cards ===== */
+  .game{
+    background:var(--navy-3);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:14px;
+    margin:12px 0;
+  }
+  .head{
+    display:flex;
+    gap:10px;
+    align-items:center;
+    flex-wrap:wrap;
+    border-bottom:1px dashed var(--border);
+    padding:0 4px 10px;
+    margin-bottom:8px;
+  }
+  .when{color:var(--muted);font-size:.92rem;}
+  .teams{font-weight:700;color:var(--orange);}
+
+  .rowlabel{
+    grid-column:1/-1;
+    color:var(--muted);
+    font-size:.84rem;
+    margin-top:6px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .lockedTag{
+    font-size:.75rem;
+    color:var(--muted);
+    border:1px solid var(--border);
+    background:rgba(16,27,51,0.35);
+    padding:4px 8px;
+    border-radius:999px;
+  }
+  .lockedTag b{ color:var(--ok); font-weight:800; }
+
+  /* Desktop/tablet default layout */
+  .row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    align-items:stretch;
+    margin:8px 0 2px;
+  }
+
+  .pill{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    border-radius:10px;
+    padding:10px;
+    display:flex;
+    justify-content:space-between;
+    gap:8px;
+    color:var(--orange);
+    font-weight:600;
+    cursor:pointer;
+    transition:background .15s,box-shadow .15s,color .15s,opacity .15s;
+    user-select:none;
+  }
+  .pill .odds{opacity:.9;}
+  .pill:hover{background:#16264a;color:#ff6a1a;}
+  .pill.active{
+    box-shadow:0 0 0 2px var(--orange) inset;
+    background:#1c2946;
+    color:#fff;
+  }
+  .pill.disabled{
+    cursor:not-allowed;
+    opacity:.55;
+    filter:saturate(0.8);
+  }
+  .pill.disabled:hover{
+    background:var(--navy-2);
+    color:var(--orange);
+  }
+
+  /* Desktop bettors layout */
+  .bettors{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    font-size:.82rem;
+    color:var(--muted);
+    margin-bottom:4px;
+  }
+  .bettors span.name{color:var(--orange);}
+  .nobets{
+    color:var(--muted);
+    font-size:.9rem;
+    padding:6px 4px 2px;
+  }
+
+  /* ===== Admin footer ===== */
+  .adminBox{
+    margin-top:18px;
+    padding:14px;
+    border:1px solid var(--border);
+    background:rgba(16,27,51,0.35);
+    border-radius:16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .adminBox .left{
+    display:flex;
+    flex-direction:column;
+    gap:4px;
+    min-width:240px;
+  }
+  .adminBox .title{
+    font-weight:800;
+    color:var(--orange);
+  }
+  .adminBox .sub{
+    color:var(--muted);
+    font-size:.85rem;
+  }
+  .btn{
+    border:1px solid var(--border);
+    background:var(--navy-2);
+    color:var(--text);
+    border-radius:12px;
+    padding:10px 14px;
+    font-weight:800;
+    cursor:pointer;
+  }
+  .btn:hover{ background:#16264a; }
+  .btn:disabled{
+    cursor:not-allowed;
+    opacity:.6;
+  }
+  .adminStatus{
+    color:var(--muted);
+    font-size:.85rem;
+  }
+  .adminStatus.ok{ color:var(--ok); }
+  .adminStatus.bad{ color:var(--danger); }
+
+  /* ===== Mobile view ===== */
+  @media (max-width:780px){
+    .row{
+      display:flex;
+      flex-wrap:nowrap;
+      gap:8px;
+      align-items:stretch;
+      margin:8px 0 2px;
+    }
+    .pill{
+      flex:1 1 0;
+      min-width:0;
+      padding:9px 8px;
+      border-radius:12px;
+    }
+    .pill .name,
+    .pill .odds{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .bettors{
+      display:flex;
+      gap:8px;
+      margin:6px 0 4px;
+      font-size:.82rem;
+    }
+    .bettors > div{
+      flex:1 1 0;
+      min-width:0;
+      border:1px dashed rgba(39,56,94,.8);
+      border-radius:10px;
+      padding:8px 10px;
+      background:rgba(16,27,51,0.35);
+    }
+    .bettors .list{
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+    }
+    .bettors .item{
+      display:flex;
+      justify-content:space-between;
+      gap:8px;
+      align-items:baseline;
+      min-width:0;
+    }
+    .bettors .item .who{
+      min-width:0;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      white-space:nowrap;
+    }
+    .bettors .item .amt{
+      white-space:nowrap;
+      color:var(--muted);
+      font-variant-numeric:tabular-nums;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Wild Card Picks – Summary & Standings</h1>
+  <p class="hint">
+    Click a side in any game below to mark it as the winner. Standings update automatically from the winners saved in the Odds sheet:
+    <b>Current Money</b> = Wild Card bankroll − bets this week;
+    <b>Week Winnings</b> = total returns from winning bets (stake + profit);
+    <b>Total Money</b> = current money + week winnings.
+  </p>
+
+  <!-- Reveal gate -->
+  <div id="revealGate" class="gate" style="display:none;">
+    <h2>Picks revealed at</h2>
+    <p class="sub"><span id="revealAtText"></span> (ET)</p>
+    <div class="countdown" aria-label="Countdown to reveal">
+      <div class="cdBox"><div class="cdNum" id="cdDays">0</div><div class="cdLbl">Days</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdHours">0</div><div class="cdLbl">Hours</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdMins">0</div><div class="cdLbl">Minutes</div></div>
+      <div class="cdBox"><div class="cdNum" id="cdSecs">0</div><div class="cdLbl">Seconds</div></div>
+    </div>
+  </div>
+
+  <!-- Real content wrapper (hidden until reveal time) -->
+  <div id="realContent" style="display:none;">
+    <h2>Standings</h2>
+    <div id="standingsStatus" class="loading">Loading data…</div>
+    <table id="standingsTable" style="display:none;">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Player</th>
+          <th>Current Money</th>
+          <th>Week Winnings</th>
+          <th>Total Money</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Games</h2>
+    <div id="gamesStatus" class="loading">Loading games…</div>
+    <div id="games"></div>
+
+    <!-- Admin -->
+    <div class="adminBox">
+      <div class="left">
+        <div class="title">Admin</div>
+        <div class="sub">Sets winners in the Odds sheet and locks results.</div>
+      </div>
+      <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
+        <button id="btnUpdateResults" class="btn">Update Results</button>
+        <span id="adminStatus" class="adminStatus"></span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script>
+  /* ===== Config / URLs ===== */
+  const WEEK_FILTER = "Wild Card"; // change if you later show Divisional, etc.
+
+  // Deadline/reveal time comes from the Deadlines CSV (Round, Date, Time)
+  const DEADLINES_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=1477526617&single=true&output=csv";
+
+  // Will be set on load (UTC Date that corresponds to the ET reveal time)
+  let revealUtc = null;
+
+  function parseMDY(str){
+    // supports M/D/YYYY or MM/DD/YYYY
+    const m = String(str||"").trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(!m) return null;
+    return { month:Number(m[1]), day:Number(m[2]), year:Number(m[3]) };
+  }
+
+  function parseTime12h(str){
+    // supports H:MM AM/PM (or HH:MM AM/PM)
+    const m = String(str||"").trim().match(/^(\d{1,2}):(\d{2})\s*([AaPp][Mm])$/);
+    if(!m) return null;
+    let hour = Number(m[1]);
+    const minute = Number(m[2]);
+    const ampm = m[3].toUpperCase();
+    if (hour === 12) hour = 0;
+    if (ampm === "PM") hour += 12;
+    return { hour, minute };
+  }
+
+  // Convert a desired local time in a named tz to a UTC Date (handles DST).
+  function getZonedParts(date, timeZone){
+    const fmt = new Intl.DateTimeFormat("en-US",{
+      timeZone,
+      hour12:false,
+      year:"numeric",month:"2-digit",day:"2-digit",
+      hour:"2-digit",minute:"2-digit",second:"2-digit"
+    });
+    const parts = fmt.formatToParts(date);
+    const out = {};
+    for (const p of parts){
+      if (p.type !== "literal") out[p.type] = p.value;
+    }
+    return {
+      year: Number(out.year),
+      month: Number(out.month),
+      day: Number(out.day),
+      hour: Number(out.hour),
+      minute: Number(out.minute),
+      second: Number(out.second)
+    };
+  }
+
+  function zonedTimeToUtc({timeZone, year, month, day, hour, minute, second=0}){
+    const guess = new Date(Date.UTC(year, month-1, day, hour, minute, second));
+    const asZoned = getZonedParts(guess, timeZone);
+
+    const guessAsIfZoned = Date.UTC(asZoned.year, asZoned.month-1, asZoned.day, asZoned.hour, asZoned.minute, asZoned.second);
+    const desiredAsZoned = Date.UTC(year, month-1, day, hour, minute, second);
+
+    const diffMs = desiredAsZoned - guessAsIfZoned;
+    return new Date(guess.getTime() + diffMs);
+  }
+
+  function loadRevealFromDeadlinesCsv(){
+    return new Promise(resolve=>{
+      Papa.parse(DEADLINES_CSV_URL,{
+        download:true, header:true, dynamicTyping:false, skipEmptyLines:true,
+        complete:res=>{
+          const rows = (res.data||[]).filter(r => Object.keys(r||{}).length);
+
+          // Match the Round to WEEK_FILTER ("Wild Card")
+          const target = rows.find(r => String(r["Round"]||"").trim().toLowerCase() === String("Test").trim().toLowerCase());
+
+          if(!target){
+            console.warn("Deadlines CSV: no matching Round row found for", WEEK_FILTER);
+            revealUtc = null;
+            return resolve();
+          }
+
+          const d = parseMDY(target["Date"]);
+          const t = parseTime12h(target["Time"]);
+          if(!d || !t){
+            console.warn("Deadlines CSV: could not parse Date/Time:", target["Date"], target["Time"]);
+            revealUtc = null;
+            return resolve();
+          }
+
+          revealUtc = zonedTimeToUtc({
+            timeZone:"America/New_York",
+            year:d.year, month:d.month, day:d.day,
+            hour:t.hour, minute:t.minute, second:0
+          });
+
+          resolve();
+        },
+        error:err=>{
+          console.warn("Deadlines CSV: failed to load:", err);
+          revealUtc = null;
+          resolve();
+        }
+      });
+    });
+  }
+
+  function formatUtcAsEtNice(utcDate){
+    return new Intl.DateTimeFormat("en-US",{
+      timeZone:"America/New_York",
+      weekday:"long",
+      month:"long",
+      day:"numeric",
+      year:"numeric",
+      hour:"numeric",
+      minute:"2-digit"
+    }).format(utcDate);
+  }
+
+  const PICKS_CSV_URL   = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTGQ-_w6xMpMsaFPNq8HwQ8z8PHs3x3m5lre7bhA-tqMZcuij6L7-I61-4V-vBbBXFBXVPV5SaltVg7/pub?gid=0&single=true&output=csv";
+  const PLAYERS_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTM_TPwD9YQTag_DkvjAiadp7w3vz2OfJllUdqZoCK6MSUFoaIBWMPRhwjHoVFrmrg4liQwSxQyEaic/pub?gid=0&single=true&output=csv";
+  const ODDS_CSV_URL    = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTYrB51f7zbtdxC794-EO-FgaqHq3ZFmKilje5qGmCJJ9SjuIIMLfzlOZCf1p5PGpSc9N_swz9cRBM7/pub?gid=0&single=true&output=csv";
+
+  // ✅ SET THIS after you deploy your Apps Script as a Web App (ends with /exec)
+  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzX_D2N5GvAxho-WVmzBKGuM_DQMVtID2DwkxfJeL7i_exOEyi_qX5Ew8o2TvUkPpRF/exec";
+
+  /* Odds sheet columns */
+  const COLS = {
+    date: "Date",
+    time: "Time",
+    channel: "Channel",
+    away: "Away",
+    aSu: "A SU Line",
+    aSpread: "A Spread",
+    aSpreadLine: "A Spread Line",
+    home: "Home",
+    hSu: "H SU Line",
+    hSpread: "H Spread",
+    hSpreadLine: "H Spread Line",
+    ouTotal: "Over/Under",
+    oLine: "O Line",
+    uLine: "U Line",
+
+    // ✅ Winners (must exist in your Odds sheet header exactly like this)
+    suWinner: "S/U Winner",
+    spreadWinner: "Spread Winner",
+    ouWinner: "Over/Under Winner"
+  };
+
+  const fmtSigned = n => (n === "" || n === null || isNaN(n)) ? "" : (Number(n) > 0 ? `+${Number(n)}` : `${Number(n)}`);
+  const fmtMoney  = v => {
+    const num = Number(v||0);
+    return "$" + num.toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+  const parseMoney= v => (typeof v === "number") ? v : Number(String(v||"").replace(/[$,]/g,"")) || 0;
+
+  function computePayout(wager, odds){
+    const w = Number(wager||0), o = Number(odds);
+    if(!w || !o) return 0;
+    if(o < 0) return w + (w/Math.abs(o))*100;
+    return w + (w/100)*o;
+  }
+
+  /* ===== Data ===== */
+  let picks = [];
+  let players = [];
+  let oddsRows = [];
+
+  let oddsMap = {};              // label -> {odds}
+  let playerStartMoney = {};     // name -> bankroll for this round
+  let betsByPlayer = {};         // name -> [{label,wager,odds}]
+  let lockedWinners = new Set(); // winner labels loaded from sheet
+  let pendingByGame = {};        // gameKey -> { su:"", spread:"", ou:"" } (local selections)
+
+  function cacheBust(url){
+    const sep = url.includes("?") ? "&" : "?";
+    return url + sep + "t=" + Date.now();
+  }
+
+  function loadCSV(url){
+    return new Promise((resolve,reject)=>{
+      Papa.parse(cacheBust(url),{
+        download:true,
+        header:true,
+        dynamicTyping:true,
+        skipEmptyLines:true,
+        complete:res=>resolve(res.data || []),
+        error:err=>reject(err)
+      });
+    });
+  }
+
+  function getGameKey(row){
+    // Must match the Apps Script matching logic
+    return [
+      String(row[COLS.date] ?? "").trim(),
+      String(row[COLS.time] ?? "").trim(),
+      String(row[COLS.away] ?? "").trim(),
+      String(row[COLS.home] ?? "").trim()
+    ].join(" | ");
+  }
+
+  /* ===== NEW: O/U labels include game (e.g., "Rams @ Panthers Under 46.5") ===== */
+  function getOuLabelsForRow(row){
+    const away = String(row[COLS.away] ?? "").trim();
+    const home = String(row[COLS.home] ?? "").trim();
+    const total = String(row[COLS.ouTotal] ?? "").trim();
+    const prefix = `${away} @ ${home}`;
+
+    // New labels (what your Picks sheet now uses)
+    const overNew  = `${prefix} Over ${total}`;
+    const underNew = `${prefix} Under ${total}`;
+
+    // Legacy labels (kept for backward compatibility)
+    const overOld  = `Over ${total}`;
+    const underOld = `Under ${total}`;
+
+    return { overNew, underNew, overOld, underOld, total, prefix };
+  }
+
+// NEW: Normalize how picks are stored in the Picks CSV.
+// CSV now stores S/U + Spread as: "Away @ Home <pick>"
+// We need to match oddsMap keys which are: "<team>" or "<team> (+/-X.X)"
+// Totals (O/U) should stay game-specific ("Away @ Home Over 46.5").
+function normalizePickLabel(raw){
+  const s = String(raw || "").trim();
+  if (!s) return "";
+
+  // If it's already an O/U label (new style), keep it as-is
+  if (/\s(Over|Under)\s/i.test(s)) return s;
+
+  // If it looks like "Away @ Home Something", strip the matchup prefix
+  // Example: "Rams @ Panthers Rams" -> "Rams"
+  // Example: "Rams @ Panthers Panthers (+9.5)" -> "Panthers (+9.5)"
+  const m = s.match(/^(.+?)\s*@\s*(.+?)\s+(.+)$/);
+  if (m && m[3]) return m[3].trim();
+
+  return s;
+}
+
+
+  function buildOddsMap(){
+    oddsMap = {};
+    oddsRows.forEach(row=>{
+      if(!(row[COLS.away] && row[COLS.home])) return;
+
+      const away = row[COLS.away];
+      const home = row[COLS.home];
+
+      // Moneyline
+      oddsMap[away] = {odds: row[COLS.aSu]};
+      oddsMap[home] = {odds: row[COLS.hSu]};
+
+      // Spread
+      const aSpreadLabel = `${away} (${fmtSigned(row[COLS.aSpread])})`;
+      const hSpreadLabel = `${home} (${fmtSigned(row[COLS.hSpread])})`;
+      oddsMap[aSpreadLabel] = {odds: row[COLS.aSpreadLine]};
+      oddsMap[hSpreadLabel] = {odds: row[COLS.hSpreadLine]};
+
+      // Totals (NEW + legacy)
+      const { overNew, underNew, overOld, underOld } = getOuLabelsForRow(row);
+      oddsMap[overNew]  = {odds: row[COLS.oLine]};
+      oddsMap[underNew] = {odds: row[COLS.uLine]};
+      oddsMap[overOld]  = {odds: row[COLS.oLine]}; // legacy
+      oddsMap[underOld] = {odds: row[COLS.uLine]}; // legacy
+    });
+  }
+
+  function loadLockedWinnersFromOddsSheet(){
+    lockedWinners = new Set();
+    pendingByGame = {};
+
+    oddsRows.forEach(row=>{
+      if(!(row[COLS.away] && row[COLS.home])) return;
+      const key = getGameKey(row);
+
+      const su = String(row[COLS.suWinner] ?? "").trim();
+      const sp = String(row[COLS.spreadWinner] ?? "").trim();
+      const ou = String(row[COLS.ouWinner] ?? "").trim();
+
+      pendingByGame[key] = { su:"", spread:"", ou:"" };
+
+      if (su) lockedWinners.add(su);
+      if (sp) lockedWinners.add(sp);
+      if (ou) lockedWinners.add(ou);
+    });
+  }
+
+  function prepPlayers(){
+    players = players.filter(p => p["Player"]);
+    players = players.map(p=>({
+      name: p["Player"],
+      email: p["Email"],
+      begin: parseMoney(p["Wild Card"]),
+      wild:  parseMoney(p["After Wild Card"])
+    }));
+    playerStartMoney = {};
+    players.forEach(p=>{
+      const base = p.wild || p.begin || 0;
+      playerStartMoney[p.name] = base;
+    });
+  }
+
+  function prepPicks(){
+    picks = picks.filter(p=>{
+      if (!WEEK_FILTER) return true;
+      return String(p.Week || "").trim() === WEEK_FILTER;
+    });
+
+    betsByPlayer = {};
+    picks.forEach(p=>{
+      const name = p.Name;
+      if (!name) return;
+
+const label = normalizePickLabel(p.Pick);
+
+      const wager = Number(p.Wager || 0);
+
+      // Odds lookup now supports:
+      // - S/U team name
+      // - Spread "Team (+X.X)"
+      // - O/U "Away @ Home Under 46.5" (NEW)
+      // - O/U "Under 46.5" (legacy)
+      const oddsObj = oddsMap[label] || {odds:0};
+
+      if (!betsByPlayer[name]) betsByPlayer[name] = [];
+      betsByPlayer[name].push({ label, wager, odds: oddsObj.odds });
+    });
+  }
+
+  function groupPicksByLabel(){
+    const map = new Map();
+    picks.forEach(p=>{
+      const week = p.Week || "";
+      if (WEEK_FILTER && String(week) !== WEEK_FILTER) return;
+
+      const key = normalizePickLabel(p.Pick);
+
+      if (!key) return;
+
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(p);
+    });
+    return map;
+  }
+
+  function buildBettorsListHTML(bets){
+    if (!bets || !bets.length) {
+      return `<div class="list"><div class="item"><span class="who">No bets</span><span class="amt"></span></div></div>`;
+    }
+    return `<div class="list">${
+      bets.map(b=>`
+        <div class="item">
+          <span class="who"><span class="name">${b.Name}</span></span>
+          <span class="amt">(${fmtMoney(b.Wager)})</span>
+        </div>
+      `).join("")
+    }</div>`;
+  }
+
+  function setAdminStatus(msg, kind=""){
+    const el = document.getElementById("adminStatus");
+    el.textContent = msg || "";
+    el.className = "adminStatus" + (kind ? " " + kind : "");
+  }
+
+  function registerWinnerToggle({pillEl, otherPill, gameKey, market, locked}){
+    const label = pillEl.dataset.label;
+    if (locked){
+      pillEl.classList.add("disabled");
+      return;
+    }
+
+    pillEl.addEventListener("click", ()=>{
+      const isActive = pillEl.classList.contains("active");
+
+      // clear status line when clicking
+      setAdminStatus("");
+
+      if (isActive){
+        pillEl.classList.remove("active");
+        pendingByGame[gameKey][market] = "";
+      } else {
+        pillEl.classList.add("active");
+        pendingByGame[gameKey][market] = label;
+
+        if (otherPill){
+          otherPill.classList.remove("active");
+        }
+      }
+      recalcStandings();
+    });
+  }
+
+  function applyLockedWinnerVisual(leftPill, rightPill, winnerLabel){
+    if (!winnerLabel) return;
+    const leftLabel  = leftPill.dataset.label;
+    const rightLabel = rightPill.dataset.label;
+
+    if (winnerLabel === leftLabel){
+      leftPill.classList.add("active");
+      rightPill.classList.remove("active");
+    } else if (winnerLabel === rightLabel){
+      rightPill.classList.add("active");
+      leftPill.classList.remove("active");
+    }
+
+    leftPill.classList.add("disabled");
+    rightPill.classList.add("disabled");
+  }
+
+  function buildGameCard(row, pickMap){
+    const game = document.createElement("section");
+    game.className = "game";
+
+    const head = document.createElement("div");
+    head.className = "head";
+    const teams = document.createElement("div");
+    teams.className = "teams";
+    teams.textContent = `${row[COLS.away]} @ ${row[COLS.home]}`;
+    const when = document.createElement("div");
+    when.className = "when";
+    when.textContent = `${row[COLS.date]} • ${row[COLS.time]} • ${row[COLS.channel]}`;
+    head.append(teams, when);
+    game.appendChild(head);
+
+    const gameKey = getGameKey(row);
+    let anyRowShown = false;
+
+    function getBetsForAnyLabel(primaryLabel, altLabels){
+      const out = [];
+      const labels = [primaryLabel, ...(altLabels||[])].filter(Boolean);
+      for (const lab of labels){
+        const arr = pickMap.get(lab);
+        if (arr && arr.length) out.push(...arr);
+      }
+      return out;
+    }
+
+    function makeRow({label, market, leftLabel, leftOdds, rightLabel, rightOdds, lockedWinnerLabel, leftAltLabels=[], rightAltLabels=[]}){
+      const leftBets  = getBetsForAnyLabel(leftLabel, leftAltLabels);
+      const rightBets = getBetsForAnyLabel(rightLabel, rightAltLabels);
+
+      if (leftBets.length === 0 && rightBets.length === 0){
+        return;
+      }
+      anyRowShown = true;
+
+      const lab = document.createElement("div");
+      lab.className = "rowlabel";
+      lab.innerHTML = `<span>${label}</span>${
+        lockedWinnerLabel ? `<span class="lockedTag"><b>LOCKED</b> • winner saved</span>` : ``
+      }`;
+      game.appendChild(lab);
+
+      const r = document.createElement("div");
+      r.className = "row";
+
+      const leftPill = document.createElement("div");
+      leftPill.className = "pill";
+      leftPill.dataset.label = leftLabel;
+      leftPill.innerHTML = `<span class="name">${leftLabel}</span><span class="odds">${fmtSigned(leftOdds)}</span>`;
+
+      const rightPill = document.createElement("div");
+      rightPill.className = "pill";
+      rightPill.dataset.label = rightLabel;
+      rightPill.innerHTML = `<span class="name">${rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
+
+      const locked = !!lockedWinnerLabel;
+
+      // if locked in sheet, apply and disable
+      if (locked){
+        applyLockedWinnerVisual(leftPill, rightPill, lockedWinnerLabel);
+      } else {
+        // otherwise allow local selection (pending)
+        registerWinnerToggle({pillEl:leftPill, otherPill:rightPill, gameKey, market, locked:false});
+        registerWinnerToggle({pillEl:rightPill, otherPill:leftPill, gameKey, market, locked:false});
+
+        // restore any pending selection for this market
+        const pending = pendingByGame?.[gameKey]?.[market] || "";
+        if (pending === leftLabel) leftPill.classList.add("active");
+        if (pending === rightLabel) rightPill.classList.add("active");
+      }
+
+      r.append(leftPill, rightPill);
+      game.appendChild(r);
+
+      const b = document.createElement("div");
+      b.className = "bettors";
+      b.innerHTML = `
+        <div>${buildBettorsListHTML(leftBets)}</div>
+        <div>${buildBettorsListHTML(rightBets)}</div>
+      `;
+      game.appendChild(b);
+    }
+
+    // Moneyline
+    makeRow({
+      label:"Moneyline",
+      market:"su",
+      leftLabel: row[COLS.away], leftOdds: row[COLS.aSu],
+      rightLabel: row[COLS.home], rightOdds: row[COLS.hSu],
+      lockedWinnerLabel: String(row[COLS.suWinner] ?? "").trim()
+    });
+
+    // Spread
+    makeRow({
+      label:"Spread",
+      market:"spread",
+      leftLabel: `${row[COLS.away]} (${fmtSigned(row[COLS.aSpread])})`, leftOdds: row[COLS.aSpreadLine],
+      rightLabel:`${row[COLS.home]} (${fmtSigned(row[COLS.hSpread])})`, rightOdds: row[COLS.hSpreadLine],
+      lockedWinnerLabel: String(row[COLS.spreadWinner] ?? "").trim()
+    });
+
+    // Totals (O/U) — now game-specific labels so they always show under the correct matchup
+    const { overNew, underNew, overOld, underOld, total } = getOuLabelsForRow(row);
+
+    // If the sheet has legacy winner ("Over 46.5"), map it to this game's new label when possible
+    let lockedOu = String(row[COLS.ouWinner] ?? "").trim();
+    if (lockedOu && lockedOu !== overNew && lockedOu !== underNew){
+      if (lockedOu === `Over ${total}`)  lockedOu = overNew;
+      if (lockedOu === `Under ${total}`) lockedOu = underNew;
+    }
+
+    makeRow({
+      label:"Total (O/U)",
+      market:"ou",
+      leftLabel: overNew,  leftOdds: row[COLS.oLine],
+      rightLabel: underNew, rightOdds: row[COLS.uLine],
+      lockedWinnerLabel: lockedOu,
+      // Pull in any legacy bets too (so old submissions still display)
+      leftAltLabels:[overOld],
+      rightAltLabels:[underOld]
+    });
+
+    if (!anyRowShown){
+      const nb = document.createElement("div");
+      nb.className = "nobets";
+      nb.textContent = "No bets yet.";
+      game.appendChild(nb);
+    }
+
+    return game;
+  }
+
+  function renderGames(){
+    const gamesEl  = document.getElementById("games");
+    const gamesStatus = document.getElementById("gamesStatus");
+    const pickMap = groupPicksByLabel();
+
+    gamesEl.innerHTML = "";
+    oddsRows.forEach(row=>{
+      if (!(row[COLS.away] && row[COLS.home])) return;
+      gamesEl.appendChild(buildGameCard(row, pickMap));
+    });
+
+    gamesStatus.textContent = "";
+  }
+
+  function recalcStandings(){
+    const tbody = document.querySelector("#standingsTable tbody");
+    const table = document.getElementById("standingsTable");
+    const statusEl = document.getElementById("standingsStatus");
+
+    // winners used for standings:
+    // - locked winners from sheet ALWAYS count
+    // - plus any pending selections (preview) for markets not yet locked
+    const previewWinners = new Set([...lockedWinners]);
+    Object.keys(pendingByGame).forEach(k=>{
+      const p = pendingByGame[k] || {};
+      ["su","spread","ou"].forEach(m=>{
+        const v = (p[m] || "").trim();
+        if (v) previewWinners.add(v);
+      });
+    });
+
+    const rows = [];
+
+    players.forEach(p=>{
+      const name = p.name;
+      const startMoney = playerStartMoney[name] || 0;
+      const bets = betsByPlayer[name] || [];
+
+      const totalBet = bets.reduce((sum,b)=>sum + (b.wager||0),0);
+      const currentMoney = startMoney - totalBet;
+
+      let winnings = 0;
+      bets.forEach(b=>{
+        if (previewWinners.has(b.label)){
+          winnings += computePayout(b.wager, b.odds);
+        }
+      });
+
+      rows.push({name,currentMoney,winnings,totalMoney: currentMoney + winnings});
+    });
+
+    rows.sort((a,b)=>b.totalMoney - a.totalMoney);
+
+    tbody.innerHTML = "";
+    rows.forEach((r,idx)=>{
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${idx+1}</td>
+        <td>${r.name}</td>
+        <td>${fmtMoney(r.currentMoney)}</td>
+        <td>${fmtMoney(r.winnings)}</td>
+        <td>${fmtMoney(r.totalMoney)}</td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    table.style.display = "table";
+    statusEl.textContent = "";
+  }
+
+  /* ===== Admin: push winners into Odds sheet via Apps Script (JSONP) ===== */
+  function encodePayload(obj){
+    const json = JSON.stringify(obj);
+    // base64 (url-safe enough for encodeURIComponent)
+    return btoa(unescape(encodeURIComponent(json)));
+  }
+
+  function jsonp(url){
+    return new Promise((resolve,reject)=>{
+      const cbName = "__gasCb_" + Math.random().toString(16).slice(2);
+      const script = document.createElement("script");
+      window[cbName] = (data)=>{
+        resolve(data);
+        cleanup();
+      };
+      function cleanup(){
+        try{ delete window[cbName]; }catch(e){ window[cbName]=undefined; }
+        if (script && script.parentNode) script.parentNode.removeChild(script);
+      }
+      script.onerror = ()=>{
+        cleanup();
+        reject(new Error("Failed to reach Apps Script web app (network/deploy issue)."));
+      };
+      script.src = url + (url.includes("?")?"&":"?") + "callback=" + cbName;
+      document.body.appendChild(script);
+    });
+  }
+
+  function buildResultsPayload(){
+    // Only send games where user picked something (pending), and only for markets that are not locked yet
+    const results = [];
+    oddsRows.forEach(row=>{
+      if (!(row[COLS.away] && row[COLS.home])) return;
+
+      const key = getGameKey(row);
+      const pending = pendingByGame[key] || {su:"",spread:"",ou:""};
+
+      const lockedSU = String(row[COLS.suWinner] ?? "").trim();
+      const lockedSP = String(row[COLS.spreadWinner] ?? "").trim();
+      const lockedOU = String(row[COLS.ouWinner] ?? "").trim();
+
+      const su = lockedSU ? "" : (pending.su || "");
+      const spread = lockedSP ? "" : (pending.spread || "");
+      const ou = lockedOU ? "" : (pending.ou || "");
+
+      if (!su && !spread && !ou) return;
+
+      results.push({
+        gameKey: key,
+        date: String(row[COLS.date] ?? "").trim(),
+        time: String(row[COLS.time] ?? "").trim(),
+        away: String(row[COLS.away] ?? "").trim(),
+        home: String(row[COLS.home] ?? "").trim(),
+        suWinner: su,
+        spreadWinner: spread,
+        ouWinner: ou
+      });
+    });
+
+    return { results };
+  }
+
+  async function updateResults(){
+    if (!GAS_WEBAPP_URL || GAS_WEBAPP_URL.includes("PASTE_YOUR_WEBAPP_EXEC_URL_HERE")){
+      setAdminStatus("Set GAS_WEBAPP_URL in the HTML first.", "bad");
+      return;
+    }
+
+    const pass = prompt("Admin password:");
+    if (pass === null) return;
+
+    const btn = document.getElementById("btnUpdateResults");
+    btn.disabled = true;
+    setAdminStatus("Updating Odds sheet…", "");
+
+    try{
+      const payloadObj = buildResultsPayload();
+      if (!payloadObj.results.length){
+        setAdminStatus("No new winners selected to save.", "");
+        btn.disabled = false;
+        return;
+      }
+
+      const payload = encodePayload(payloadObj);
+
+      const url =
+        GAS_WEBAPP_URL +
+        (GAS_WEBAPP_URL.includes("?") ? "&" : "?") +
+        "password=" + encodeURIComponent(pass) +
+        "&payload=" + encodeURIComponent(payload) +
+        "&_=" + Date.now(); // bust caches
+
+      const resp = await jsonp(url);
+
+      if (!resp || !resp.ok){
+        setAdminStatus(resp?.error || "Update failed.", "bad");
+        btn.disabled = false;
+        return;
+      }
+
+      setAdminStatus(`Saved: ${resp.updated} cell(s). Refreshing…`, "ok");
+
+      // Reload from sheets so UI locks + standings reflect saved results
+      await loadAndRender(true);
+
+      setAdminStatus("Results updated and locked from sheet.", "ok");
+    } catch (e){
+      console.error(e);
+      setAdminStatus(e.message || "Update failed (see console).", "bad");
+    } finally{
+      btn.disabled = false;
+    }
+  }
+
+  /* ===== Reveal gate logic ===== */
+  let countdownTimer = null;
+
+  function setCountdown(msLeft){
+    const totalSec = Math.max(0, Math.floor(msLeft / 1000));
+    const days = Math.floor(totalSec / 86400);
+    const hours = Math.floor((totalSec % 86400) / 3600);
+    const mins = Math.floor((totalSec % 3600) / 60);
+    const secs = totalSec % 60;
+
+    document.getElementById("cdDays").textContent  = String(days);
+    document.getElementById("cdHours").textContent = String(hours).padStart(2,"0");
+    document.getElementById("cdMins").textContent  = String(mins).padStart(2,"0");
+    document.getElementById("cdSecs").textContent  = String(secs).padStart(2,"0");
+  }
+
+  function showGate(revealEtNice){
+    document.getElementById("revealAtText").textContent = revealEtNice;
+    document.getElementById("revealGate").style.display = "block";
+    document.getElementById("realContent").style.display = "none";
+  }
+
+  function showContent(){
+    document.getElementById("revealGate").style.display = "none";
+    document.getElementById("realContent").style.display = "block";
+  }
+
+  async function loadAndRender(isReload=false){
+    const standingsStatus = document.getElementById("standingsStatus");
+    const gamesStatus = document.getElementById("gamesStatus");
+
+    try{
+      standingsStatus.textContent = isReload ? "Refreshing data…" : "Loading odds, players, and picks…";
+      gamesStatus.textContent = "Loading games…";
+
+      const [oddsData, playersData, picksData] = await Promise.all([
+        loadCSV(ODDS_CSV_URL),
+        loadCSV(PLAYERS_CSV_URL),
+        loadCSV(PICKS_CSV_URL)
+      ]);
+
+      oddsRows = oddsData;
+      players  = playersData;
+      picks    = picksData;
+
+      buildOddsMap();
+      loadLockedWinnersFromOddsSheet();
+      prepPlayers();
+      prepPicks();
+
+      renderGames();
+      recalcStandings();
+    }catch(err){
+      console.error(err);
+      standingsStatus.className = "error";
+      standingsStatus.textContent = "Error loading data. See console for details.";
+      gamesStatus.className = "error";
+      gamesStatus.textContent = "Error loading data.";
+    }
+  }
+
+  async function initRevealGate(){
+    // Load reveal time from the Deadlines CSV (Wild Card row)
+    await loadRevealFromDeadlinesCsv();
+
+    // If we couldn't load it, fail open (show content immediately)
+    if(!revealUtc){
+      console.warn("Reveal time not loaded; showing content immediately.");
+      showContent();
+      await loadAndRender();
+      document.getElementById("btnUpdateResults").addEventListener("click", updateResults);
+      return;
+    }
+
+    const revealNice = formatUtcAsEtNice(revealUtc);
+
+    const tick = async ()=>{
+      const now = new Date();
+      const msLeft = revealUtc.getTime() - now.getTime();
+
+      if (msLeft <= 0){
+        if (countdownTimer) clearInterval(countdownTimer);
+        showContent();
+        await loadAndRender();
+        document.getElementById("btnUpdateResults").addEventListener("click", updateResults);
+        return;
+      }
+
+      showGate(revealNice);
+      setCountdown(msLeft);
+    };
+
+    tick();
+    countdownTimer = setInterval(tick, 1000);
+  }
+
+  initRevealGate();
+</script>
+</body>
+</html>
