@@ -438,7 +438,7 @@
           const rows = (res.data||[]).filter(r => Object.keys(r||{}).length);
 
           // Match the Round to WEEK_FILTER ("Wild Card")
-          const target = rows.find(r => String(r["Round"]||"").trim().toLowerCase() === String(WEEK_FILTER).trim().toLowerCase());
+          const target = rows.find(r => String(r["Round"]||"").trim().toLowerCase() === String("Wild Card").trim().toLowerCase());
 
           if(!target){
             console.warn("Deadlines CSV: no matching Round row found for", WEEK_FILTER);
@@ -584,26 +584,25 @@
     return { overNew, underNew, overOld, underOld, total, prefix };
   }
 
-// NEW: Normalize how picks are stored in the Picks CSV.
-// CSV now stores S/U + Spread as: "Away @ Home <pick>"
-// We need to match oddsMap keys which are: "<team>" or "<team> (+/-X.X)"
-// Totals (O/U) should stay game-specific ("Away @ Home Over 46.5").
-function normalizePickLabel(raw){
-  const s = String(raw || "").trim();
-  if (!s) return "";
+  // NEW: Normalize how picks are stored in the Picks CSV.
+  // CSV now stores S/U + Spread as: "Away @ Home <pick>"
+  // We need to match oddsMap keys which are: "<team>" or "<team> (+/-X.X)"
+  // Totals (O/U) should stay game-specific ("Away @ Home Over 46.5").
+  function normalizePickLabel(raw){
+    const s = String(raw || "").trim();
+    if (!s) return "";
 
-  // If it's already an O/U label (new style), keep it as-is
-  if (/\s(Over|Under)\s/i.test(s)) return s;
+    // If it's already an O/U label (new style), keep it as-is
+    if (/\s(Over|Under)\s/i.test(s)) return s;
 
-  // If it looks like "Away @ Home Something", strip the matchup prefix
-  // Example: "Rams @ Panthers Rams" -> "Rams"
-  // Example: "Rams @ Panthers Panthers (+9.5)" -> "Panthers (+9.5)"
-  const m = s.match(/^(.+?)\s*@\s*(.+?)\s+(.+)$/);
-  if (m && m[3]) return m[3].trim();
+    // If it looks like "Away @ Home Something", strip the matchup prefix
+    // Example: "Rams @ Panthers Rams" -> "Rams"
+    // Example: "Rams @ Panthers Panthers (+9.5)" -> "Panthers (+9.5)"
+    const m = s.match(/^(.+?)\s*@\s*(.+?)\s+(.+)$/);
+    if (m && m[3]) return m[3].trim();
 
-  return s;
-}
-
+    return s;
+  }
 
   function buildOddsMap(){
     oddsMap = {};
@@ -678,8 +677,7 @@ function normalizePickLabel(raw){
       const name = p.Name;
       if (!name) return;
 
-const label = normalizePickLabel(p.Pick);
-
+      const label = normalizePickLabel(p.Pick);
       const wager = Number(p.Wager || 0);
 
       // Odds lookup now supports:
@@ -701,7 +699,6 @@ const label = normalizePickLabel(p.Pick);
       if (WEEK_FILTER && String(week) !== WEEK_FILTER) return;
 
       const key = normalizePickLabel(p.Pick);
-
       if (!key) return;
 
       if (!map.has(key)) map.set(key, []);
@@ -803,7 +800,18 @@ const label = normalizePickLabel(p.Pick);
       return out;
     }
 
-    function makeRow({label, market, leftLabel, leftOdds, rightLabel, rightOdds, lockedWinnerLabel, leftAltLabels=[], rightAltLabels=[]}){
+    function makeRow({
+      label,
+      market,
+      leftLabel, leftOdds,
+      rightLabel, rightOdds,
+      lockedWinnerLabel,
+      leftAltLabels=[],
+      rightAltLabels=[],
+      // ✅ NEW: purely visual text for pills (dataset.label remains full label)
+      displayLeftLabel=null,
+      displayRightLabel=null
+    }){
       const leftBets  = getBetsForAnyLabel(leftLabel, leftAltLabels);
       const rightBets = getBetsForAnyLabel(rightLabel, rightAltLabels);
 
@@ -825,12 +833,12 @@ const label = normalizePickLabel(p.Pick);
       const leftPill = document.createElement("div");
       leftPill.className = "pill";
       leftPill.dataset.label = leftLabel;
-      leftPill.innerHTML = `<span class="name">${leftLabel}</span><span class="odds">${fmtSigned(leftOdds)}</span>`;
+      leftPill.innerHTML = `<span class="name">${displayLeftLabel ?? leftLabel}</span><span class="odds">${fmtSigned(leftOdds)}</span>`;
 
       const rightPill = document.createElement("div");
       rightPill.className = "pill";
       rightPill.dataset.label = rightLabel;
-      rightPill.innerHTML = `<span class="name">${rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
+      rightPill.innerHTML = `<span class="name">${displayRightLabel ?? rightLabel}</span><span class="odds">${fmtSigned(rightOdds)}</span>`;
 
       const locked = !!lockedWinnerLabel;
 
@@ -878,7 +886,7 @@ const label = normalizePickLabel(p.Pick);
       lockedWinnerLabel: String(row[COLS.spreadWinner] ?? "").trim()
     });
 
-    // Totals (O/U) — now game-specific labels so they always show under the correct matchup
+    // Totals (O/U) — labels stay game-specific internally, but pills display only "Over X" / "Under X"
     const { overNew, underNew, overOld, underOld, total } = getOuLabelsForRow(row);
 
     // If the sheet has legacy winner ("Over 46.5"), map it to this game's new label when possible
@@ -896,7 +904,10 @@ const label = normalizePickLabel(p.Pick);
       lockedWinnerLabel: lockedOu,
       // Pull in any legacy bets too (so old submissions still display)
       leftAltLabels:[overOld],
-      rightAltLabels:[underOld]
+      rightAltLabels:[underOld],
+      // ✅ ONLY visual change requested:
+      displayLeftLabel: `Over ${total}`,
+      displayRightLabel: `Under ${total}`
     });
 
     if (!anyRowShown){
