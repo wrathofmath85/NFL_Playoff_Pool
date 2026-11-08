@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Register · Playoff Pick'em</title>
+<link rel="stylesheet" href="pool.css"/>
+</head>
+<body>
+<main class="wrap" style="max-width:860px">
+  <div class="grid2">
+    <section class="card" id="formCard">
+      <div class="kicker">Join the pool</div>
+      <h1 style="margin:6px 0 14px">Register</h1>
+      <div id="formBody"><div class="skeleton" style="margin:0"></div></div>
+    </section>
+    <aside class="stack">
+      <section class="card" id="info"></section>
+      <section class="card"><h3 style="margin-bottom:8px">Already registered</h3><div class="names" id="roster"><span class="dim">Loading…</span></div></section>
+    </aside>
+  </div>
+</main>
+
+<script src="demo-data.js"></script>
+<script src="pool.js"></script>
+<script>
+Pool.nav('register');
+const { money, esc, et } = Pool;
+const $ = id => document.getElementById(id);
+
+(async () => {
+  let s;
+  try { s = await Pool.get('state'); }
+  catch (e) { $('formBody').innerHTML = `<div class="note err">${esc(e.message)}</div>`; return; }
+
+  $('roster').innerHTML = s.leaderboard.length
+    ? s.leaderboard.map(p => p.name).sort((a, b) => a.localeCompare(b)).map(n => `<span class="chip">${esc(n)}</span>`).join('')
+    : '<span class="dim">Be the first!</span>';
+
+  $('info').innerHTML = `<h3 style="margin-bottom:8px">The deal</h3>
+    <ul style="margin:0;padding-left:18px;color:var(--muted)">
+      <li>Start with <b style="color:var(--text)">${money(s.pool.startingBankroll)}</b> in play money</li>
+      <li>Bet moneylines, spreads &amp; totals each round</li>
+      <li>Most money after the Super Bowl wins</li>
+    </ul>
+    ${s.pool.entryFee ? `<div class="note" style="margin-top:12px"><b style="color:var(--text)">Entry: ${money(s.pool.entryFee)}</b>${s.pool.paymentInfo ? `<br>${esc(s.pool.paymentInfo)}` : ''}</div>` : ''}
+    ${s.registration.deadline ? `<p class="dim" style="font-size:.85rem;margin:10px 0 0">Registration closes ${esc(et(s.registration.deadline))}</p>` : ''}`;
+
+  if (!s.registration.open) {
+    $('formBody').innerHTML = `<div class="note warn">Registration is closed for this year. Catch you next January! 🏈</div>
+      <div class="btnRow" style="margin-top:14px"><a class="btn" href="board.html">See the standings</a></div>`;
+    return;
+  }
+  $('formBody').innerHTML = `<form id="f" autocomplete="on">
+      <div class="field"><label for="nm">Name (how it shows on the board)</label><input class="input" id="nm" name="name" required maxlength="40" placeholder="Daniel R."></div>
+      <div class="field"><label for="em">Email</label><input class="input" id="em" name="email" type="email" required placeholder="you@example.com"></div>
+      <div class="field"><label for="ph">Phone <span class="dim">(optional)</span></label><input class="input" id="ph" name="phone" type="tel" placeholder="317-555-0100"></div>
+      <button class="btn primary" id="go" style="width:100%">Register</button>
+      <p class="dim" style="font-size:.8rem;margin:10px 0 0">You'll get emails when each round opens, a reminder if you haven't picked, and standings after each round.</p>
+    </form>`;
+  $('f').onsubmit = async e => {
+    e.preventDefault();
+    const btn = $('go'); btn.disabled = true; btn.textContent = 'Registering…';
+    try {
+      const r = await Pool.post({ action: 'register', name: $('nm').value, email: $('em').value, phone: $('ph').value });
+      Pool.remember('name', r.name);
+      $('formBody').innerHTML = `<div class="note ok" style="font-size:1rem">You're in, <b>${esc(r.name)}</b>! 🎉</div>
+        <p class="muted">${esc(r.message || '')}</p>
+        ${s.pool.entryFee ? `<p>Don't forget the <b>${money(s.pool.entryFee)}</b> entry${s.pool.paymentInfo ? ': ' + esc(s.pool.paymentInfo) : ''}.</p>` : ''}
+        <div class="btnRow"><a class="btn primary" href="index.html">Pool home</a></div>`;
+    } catch (err) { Pool.toast(err.message, 1); btn.disabled = false; btn.textContent = 'Register'; }
+  };
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Playoff Pick'em</title>
+<link rel="stylesheet" href="pool.css"/>
+</head>
+<body>
+<main class="wrap">
+  <section class="card hero" id="hero"><div class="skeleton" style="margin:0"></div></section>
+  <div class="timeline" id="timeline"></div>
+
+  <div class="grid2" style="margin-top:22px">
+    <section class="card">
+      <div class="cardHead">
+        <h2>Leaderboard</h2>
+        <span class="dim" id="lbNote"></span>
+      </div>
+      <div class="tblWrap"><table class="tbl" id="lb"><tbody><tr><td class="dim">Loading…</td></tr></tbody></table></div>
+    </section>
+
+    <div class="stack">
+      <section class="card hidden" id="regCard"></section>
+      <section class="card">
+        <details class="rules" open>
+          <summary>How it works</summary>
+          <ul id="rules"></ul>
+        </details>
+      </section>
+      <section class="card">
+        <div class="cardHead"><h2>Past champs</h2></div>
+        <table class="tbl" id="hist"><tbody></tbody></table>
+      </section>
+    </div>
+  </div>
+  <footer class="foot">Playoff Pick'em · lines and scores via ESPN · graded automatically</footer>
+</main>
+
+<script src="demo-data.js"></script>
+<script src="pool.js"></script>
+<script>
+Pool.nav('home');
+const { money, esc, et, badge } = Pool;
+
+async function load() {
+  let s;
+  try { s = await Pool.get('state'); }
+  catch (e) { document.getElementById('hero').innerHTML = `<div class="note err">Couldn't load the pool: ${esc(e.message)}</div>`; return; }
+
+  const cur = s.rounds.find(r => r.key === s.current) || s.rounds[0];
+  const idx = s.rounds.indexOf(cur);
+  const nextUp = s.rounds.find(r => r.status === 'upcoming');
+  const players = s.leaderboard.length;
+  const pct = players ? Math.round(cur.submitted / players * 100) : 0;
+
+  /* --- hero --- */
+  let body, cta = '';
+  if (cur.status === 'open') {
+    body = `<p class="muted" style="margin:0 0 4px">Picks lock ${esc(et(cur.deadline))}</p>
+      <div class="muted" style="font-size:.85rem">${cur.submitted} of ${players} players are in</div><div class="meter"><i style="width:${pct}%"></i></div>`;
+    cta = `<div class="countdown" data-countdown="${cur.deadline}"></div>
+      <div class="btnRow" style="margin-top:12px"><a class="btn primary" href="picks.html?r=${cur.key}">Make my picks →</a>
+      <a class="btn" href="board.html?r=${cur.key}">Who's in</a></div>`;
+  } else if (cur.status === 'locked') {
+    body = `<p class="muted" style="margin:0">Picks are locked and revealed. Scores update automatically.</p>`;
+    cta = `<div class="btnRow"><a class="btn primary" href="board.html?r=${cur.key}">Watch it live →</a></div>`;
+  } else if (cur.status === 'final') {
+    const done = idx === s.rounds.length - 1;
+    body = done && s.leaderboard[0]
+      ? `<p style="margin:0;font-size:1.1rem">🏆 <b>${esc(s.leaderboard[0].name)}</b> wins it with <b>${money(s.leaderboard[0].worth)}</b>.</p>`
+      : `<p class="muted" style="margin:0">${esc(cur.name)} is in the books.${nextUp ? ` ${esc(nextUp.name)} lines are coming soon.` : ''}</p>`;
+    cta = `<div class="btnRow"><a class="btn primary" href="board.html?r=${cur.key}">See results →</a></div>`;
+  } else {
+    body = `<p class="muted" style="margin:0">Lines for ${esc(cur.name)} haven't been posted yet. ${s.registration.open ? 'Get registered so you get the email when they drop.' : ''}</p>`;
+    cta = s.registration.open ? `<div class="btnRow"><a class="btn primary" href="register.html">Register →</a></div>` : '';
+  }
+  document.getElementById('hero').innerHTML = `<div class="heroRow">
+      <div><div class="kicker">${esc(s.pool.name)} · ${s.pool.season} season · Round ${idx + 1} of ${s.rounds.length}</div>
+        <h1>${esc(cur.name)}</h1><div style="margin-bottom:12px">${badge(cur.status)}</div>${body}</div>
+      <div>${cta}</div></div>`;
+
+  /* --- timeline --- */
+  document.getElementById('timeline').innerHTML = s.rounds.map((r, i) => {
+    const sub = r.status === 'upcoming' ? 'Not posted' : r.status === 'open' ? 'Due ' + et(r.deadline, { hour: undefined, minute: undefined }).replace(' ET', '')
+      : r.games + ' games';
+    const href = r.status === 'open' ? `picks.html?r=${r.key}` : `board.html?r=${r.key}`;
+    return `<a class="tl ${r.key === cur.key ? 'cur' : ''}" href="${href}"><div class="n">Round ${i + 1}</div>
+      <div class="t">${esc(r.name)}</div>${Pool.badge(r.status)} <span class="dim" style="font-size:.8rem">${esc(sub)}</span></a>`;
+  }).join('');
+
+  /* --- leaderboard --- */
+  const revealed = s.rounds.filter(r => r.status === 'locked' || r.status === 'final');
+  const last = revealed[revealed.length - 1];
+  const openR = s.rounds.find(r => r.status === 'open');
+  const me = Pool.remember('name');
+  document.getElementById('lbNote').textContent = last ? `through ${last.name}${last.status === 'locked' ? ' (live)' : ''}` : `everyone starts with ${money(s.pool.startingBankroll)}`;
+  const lb = s.leaderboard;
+  document.getElementById('lb').innerHTML = !lb.length ? '<tbody><tr><td class="dim">No players yet.</td></tr></tbody>' :
+    `<thead><tr><th>#</th><th>Player</th>${revealed.map(r => `<th class="r hideSm">${r.key}</th>`).join('')}<th class="r">Bankroll</th>${openR ? `<th class="r">${openR.key}</th>` : ''}</tr></thead><tbody>` +
+    lb.map(p => `<tr class="${p.alive ? '' : 'out'} ${me && me === p.name ? 'me' : ''}">
+      <td class="rank ${p.rank <= 3 ? 'top' : ''}">${p.rank}</td>
+      <td>${esc(p.name)}${p.alive ? '' : ' <span class="dim">· busted</span>'}</td>
+      ${revealed.map(r => { const d = p.byRound[r.key]?.delta || 0; return `<td class="r num hideSm ${d > 0 ? 'up' : d < 0 ? 'down' : 'dim'}">${d ? money(d, { sign: 1, round: 1 }) : '—'}</td>`; }).join('')}
+      <td class="r num"><b>${money(p.worth)}</b>${p.pending ? `<div class="dim" style="font-size:.72rem">${money(p.pending)} riding</div>` : ''}</td>
+      ${openR ? `<td class="r">${p.submittedOpen ? '<span class="up">✓ in</span>' : p.alive ? '<span class="dim">—</span>' : ''}</td>` : ''}
+    </tr>`).join('') + '</tbody>';
+
+  /* --- register card --- */
+  if (s.registration.open) {
+    const rc = document.getElementById('regCard');
+    rc.classList.remove('hidden');
+    rc.innerHTML = `<div class="kicker">Registration open</div><h2 style="margin:4px 0 6px">Get in the pool</h2>
+      <p class="muted" style="margin:0 0 12px">${s.registration.count} registered${s.registration.deadline ? ` · closes ${esc(et(s.registration.deadline))}` : ''}${s.pool.entryFee ? ` · ${money(s.pool.entryFee)} entry` : ''}</p>
+      <a class="btn primary" href="register.html">Register →</a>`;
+  }
+
+  /* --- rules --- */
+  document.getElementById('rules').innerHTML = [
+    `Everyone starts the Wild Card round with <b>${money(s.pool.startingBankroll)}</b> in play money.`,
+    `Each round, bet any amount on any game's <b>moneyline</b>, <b>spread</b>, and/or <b>total</b>. One side per market.`,
+    `Payouts use the posted American odds. A win returns your stake + profit; a push gives your stake back.`,
+    `Money you don't bet (plus your winnings) carries into the next round. Hit $0 and you're out.`,
+    `Picks lock at the round deadline and are revealed to everyone then. You can edit until the lock with your confirmation code.`,
+    `Most money after the Super Bowl wins.`
+  ].map(x => `<li>${x}</li>`).join('');
+
+  /* --- history --- */
+  const h = (s.history || []).slice().sort((a, b) => (+b.year || 0) - (+a.year || 0));
+  document.getElementById('hist').innerHTML = h.length ? '<tbody>' + h.map(x => `<tr><td class="dim" style="width:60px">${esc(x.year)}</td>
+    <td>${esc(x.champ)}</td><td class="r num">${typeof x.wonWith === 'number' ? money(x.wonWith) : esc(x.wonWith)}</td></tr>`).join('') + '</tbody>'
+    : '<tbody><tr><td class="dim">No history yet.</td></tr></tbody>';
+
+  Pool.startCountdowns(load);
+}
+load();
+</script>
+</body>
+</html>

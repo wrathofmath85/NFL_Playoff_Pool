@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Make Picks · Playoff Pick'em</title>
+<link rel="stylesheet" href="pool.css"/>
+</head>
+<body>
+<main class="wrap">
+  <section class="card hero" id="head"><div class="skeleton" style="margin:0"></div></section>
+  <section class="card hidden" id="who" style="margin-top:16px"></section>
+  <div id="gate"></div>
+  <div id="games"></div>
+</main>
+
+<div class="slip" id="slip"><div class="in">
+  <div class="slipStat"><span>Bankroll</span><b id="sBank">$0</b></div>
+  <div class="slipStat" id="sBetWrap"><span>Wagered</span><b id="sBet">$0</b></div>
+  <div class="slipStat" id="sLeftWrap"><span>Left over</span><b id="sLeft">$0</b></div>
+  <div class="slipBar" id="sBar"><i style="width:0"></i></div>
+  <button class="btn primary" id="sGo" disabled>Review picks</button>
+</div></div>
+
+<script src="demo-data.js"></script>
+<script src="pool.js"></script>
+<script>
+Pool.nav('picks');
+const { money, odds, esc, et, payout } = Pool;
+const MK = { ML: 'Moneyline', SPREAD: 'Spread', TOTAL: 'Total' };
+const SIDES = { ML: ['AWAY', 'HOME'], SPREAD: ['AWAY', 'HOME'], TOTAL: ['OVER', 'UNDER'] };
+let R = null, player = null, sel = {}, conf = '';
+const $ = id => document.getElementById(id);
+
+async function init() {
+  let key = (Pool.param('r') || '').toUpperCase();
+  try {
+    if (!key) {
+      const s = await Pool.get('state');
+      key = (s.rounds.find(r => r.status === 'open') || s.rounds.find(r => r.key === s.current) || s.rounds[0]).key;
+    }
+    R = await Pool.get('round', { round: key });
+  } catch (e) { $('head').innerHTML = `<div class="note err">Couldn't load picks: ${esc(e.message)}</div>`; return; }
+  try { history.replaceState(null, '', '?r=' + R.round.key); } catch (e) {}
+  renderHead();
+  if (R.round.status !== 'open') return;
+  renderWho();
+}
+
+function renderHead() {
+  const r = R.round;
+  const n = R.players.filter(p => p.submitted).length;
+  let right = '', sub = '';
+  if (r.status === 'open') { right = `<div class="countdown" data-countdown="${r.deadline}"></div>`; sub = `Picks lock <b>${esc(et(r.deadline))}</b> · ${n} of ${R.players.length} in`; }
+  else if (r.status === 'upcoming') sub = 'Lines haven\'t been posted yet — you\'ll get an email when they are.';
+  else sub = `Picks are closed. <a href="board.html?r=${r.key}">See everyone's picks →</a>`;
+  $('head').innerHTML = `<div class="heroRow"><div><div class="kicker">Make picks</div><h1>${esc(r.name)}</h1>
+    <div style="margin-bottom:8px">${Pool.badge(r.status)}</div><p class="muted" style="margin:0">${sub}</p></div><div>${right}</div></div>`;
+  Pool.startCountdowns(() => location.reload());
+}
+
+function renderWho() {
+  const w = $('who');
+  w.classList.remove('hidden');
+  const last = Pool.remember('name');
+  w.innerHTML = `<div class="field" style="margin:0"><label for="pSel">Who are you?</label>
+    <select class="input" id="pSel"><option value="">— Select your name —</option>
+    ${R.players.map(p => `<option ${p.name === last ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></div>
+    <p class="dim" style="font-size:.8rem;margin:8px 0 0">Not listed? <a href="register.html">Register</a> (if registration is still open) or ask the commissioner.</p>`;
+  $('pSel').addEventListener('change', e => choose(e.target.value));
+  if (last && R.players.some(p => p.name === last)) choose(last);
+}
+
+function choose(name) {
+  sel = {}; conf = '';
+  $('games').innerHTML = ''; $('gate').innerHTML = '';
+  $('slip').classList.remove('show');
+  player = R.players.find(p => p.name === name) || null;
+  if (!player) return;
+  Pool.remember('name', name);
+  if (R.requirePaid && !player.paid) return gate(`<div class="note warn">You're not marked as paid yet, so picks are locked. Pay the entry fee and the commissioner will flip you to paid.</div>`);
+  if (!player.alive) return gate(`<div class="note">🪦 You're out of money — nothing to bet this round. Thanks for playing, and enjoy the sweat on the <a href="board.html?r=${R.round.key}">board</a>.</div>`);
+  if (player.submitted) {
+    const saved = Pool.remember('conf_' + R.round.key + '_' + name) || '';
+    gate(`<div class="card"><h3>You're already in for ${esc(R.round.name)} ✓</h3>
+      <p class="muted">To view or change your picks, enter the confirmation code from your most recent email.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><input class="input code" id="cIn" maxlength="6" placeholder="ABC123" value="${esc(saved)}" style="max-width:200px">
+      <button class="btn primary" id="cGo">Load my picks</button></div></div>`);
+    $('cGo').onclick = loadMine;
+    $('cIn').addEventListener('keydown', e => e.key === 'Enter' && loadMine());
+    if (saved) loadMine();
+    return;
+  }
+  renderGames();
+}
+const gate = html => { $('gate').innerHTML = `<div style="margin-top:16px">${html}</div>`; };
+
+async function loadMine() {
+  const code = $('cIn').value.trim().toUpperCase();
+  if (!code) return Pool.toast('Enter your code', 1);
+  $('cGo').disabled = true;
+  try {
+    const r = await Pool.post({ action: 'mine', round: R.round.key, name: player.name, conf: code });
+    conf = r.conf; sel = {};
+    r.picks.forEach(p => { sel[p.gameId + '|' + p.market] = { side: p.side, wager: p.wager }; });
+    Pool.remember('conf_' + R.round.key + '_' + player.name, conf);
+    gate(`<div class="note ok">Loaded your picks (code ${esc(conf)}). Change anything and resubmit — you'll get a new code.</div>`);
+    renderGames();
+  } catch (e) { Pool.toast(e.message, 1); $('cGo').disabled = false; }
+}
+
+function renderGames() {
+  $('games').innerHTML = R.games.map(g => {
+    const started = g.started;
+    return `<article class="game" data-g="${g.gameId}">
+      <div class="gHead"><div class="matchup">${esc(g.away)}<span class="at">@</span>${esc(g.home)}</div>
+        <div class="gMeta">${esc(et(g.kickoff))}${g.channel ? ' · ' + esc(g.channel) : ''}${started ? ' · <span class="down">kicked off</span>' : ''}</div></div>
+      ${Object.keys(MK).map(m => {
+        const s = sel[g.gameId + '|' + m] || {};
+        return `<div class="mkt" data-m="${m}">
+          <div class="mLabel">${MK[m]}</div>
+          ${SIDES[m].map(sd => { const x = g.markets[m][sd];
+            return `<button class="side ${s.side === sd ? 'on' : ''}" data-side="${sd}" ${started ? 'disabled' : ''}><span>${esc(x.label)}</span><b>${odds(x.odds)}</b></button>`; }).join('')}
+          <div class="wagerBox"><div class="money"><input type="number" inputmode="numeric" min="0" step="1" placeholder="0"
+            value="${s.wager || ''}" ${started ? 'disabled' : ''}></div><div class="toWin"></div></div></div>`;
+      }).join('')}</article>`;
+  }).join('');
+
+  document.querySelectorAll('.mkt').forEach(row => {
+    const gid = row.closest('.game').dataset.g, m = row.dataset.m, k = gid + '|' + m;
+    const inp = row.querySelector('input');
+    row.querySelectorAll('.side').forEach(b => b.onclick = () => {
+      const cur = sel[k] || {};
+      if (cur.side === b.dataset.side) cur.side = null; else cur.side = b.dataset.side;
+      sel[k] = cur;
+      row.querySelectorAll('.side').forEach(x => x.classList.toggle('on', x.dataset.side === cur.side));
+      if (cur.side && !inp.value) inp.focus();
+      update();
+    });
+    inp.oninput = () => { (sel[k] = sel[k] || {}).wager = Math.max(0, Math.floor(+inp.value || 0)); update(); };
+  });
+  $('slip').classList.add('show');
+  update();
+}
+
+function picksList() {
+  const out = [];
+  Object.entries(sel).forEach(([k, v]) => {
+    if (!v.side || !(v.wager > 0)) return;
+    const [gameId, market] = k.split('|');
+    const g = R.games.find(x => x.gameId === gameId);
+    if (!g || g.started) return;
+    const x = g.markets[market][v.side];
+    out.push({ gameId, market, side: v.side, wager: v.wager, g, label: x.label, odds: x.odds, toWin: payout(v.wager, x.odds) });
+  });
+  return out;
+}
+
+function update() {
+  document.querySelectorAll('.mkt').forEach(row => {
+    const k = row.closest('.game').dataset.g + '|' + row.dataset.m, s = sel[k] || {}, tw = row.querySelector('.toWin');
+    const g = R.games.find(x => x.gameId === k.split('|')[0]);
+    if (s.wager > 0 && !s.side) { tw.className = 'toWin err'; tw.textContent = 'Pick a side'; }
+    else if (s.wager > 0) { tw.className = 'toWin'; tw.innerHTML = `Returns <b>${money(payout(s.wager, g.markets[row.dataset.m][s.side].odds))}</b>`; }
+    else { tw.className = 'toWin'; tw.textContent = s.side ? 'Enter a wager' : ''; }
+  });
+  const bank = player.bankroll, list = picksList(), bet = list.reduce((a, p) => a + p.wager, 0), left = bank - bet;
+  const orphan = Object.values(sel).some(v => v.wager > 0 && !v.side);
+  $('sBank').textContent = money(bank);
+  $('sBet').textContent = money(bet);
+  $('sLeft').textContent = money(left);
+  const over = left < 0;
+  $('sLeftWrap').classList.toggle('bad', over);
+  $('sBar').classList.toggle('bad', over);
+  $('sBar').firstElementChild.style.width = Math.min(100, bank ? bet / bank * 100 : 0) + '%';
+  const minW = R.minWager || 1, small = list.some(p => p.wager < minW);
+  $('sGo').disabled = !list.length || over || orphan || small;
+  $('sGo').textContent = over ? `Over by ${money(-left)}` : orphan ? 'Finish your picks' : list.length ? `Review ${list.length} pick${list.length > 1 ? 's' : ''}` : 'Make a pick';
+}
+
+$('sGo').onclick = () => {
+  const list = picksList(), bet = list.reduce((a, p) => a + p.wager, 0);
+  const m = Pool.modal(`<h2>Confirm ${esc(R.round.name)} picks</h2>
+    <p class="muted" style="margin:4px 0 10px">${esc(player.name)}${conf ? ' · replaces your earlier picks' : ''}</p>
+    <table class="tbl"><thead><tr><th>Pick</th><th class="r">Bet</th><th class="r">Returns</th></tr></thead><tbody>
+    ${list.map(p => `<tr><td><div class="dim" style="font-size:.75rem">${esc(p.g.away)} @ ${esc(p.g.home)} · ${MK[p.market]}</div>${esc(p.label)} <span class="dim">${odds(p.odds)}</span></td>
+      <td class="r num">${money(p.wager)}</td><td class="r num up">${money(p.toWin)}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="muted" style="margin:12px 0">Betting <b>${money(bet)}</b> of ${money(player.bankroll)}. ${money(player.bankroll - bet)} carries over untouched.</p>
+    <div class="btnRow"><button class="btn primary" id="mGo">Submit picks</button><button class="btn" data-close>Keep editing</button></div>`);
+  m.querySelector('#mGo').onclick = async e => {
+    e.target.disabled = true; e.target.textContent = 'Submitting…';
+    try {
+      const r = await Pool.post({ action: 'submit', round: R.round.key, name: player.name, conf,
+        picks: list.map(({ gameId, market, side, wager }) => ({ gameId, market, side, wager })) });
+      conf = r.conf;
+      Pool.remember('conf_' + R.round.key + '_' + player.name, conf);
+      player.submitted = true;
+      m.querySelector('.modal').innerHTML = `<div class="kicker">You're in 🏈</div><h2 style="margin:6px 0">Picks submitted</h2>
+        <p class="muted">Your confirmation code — you'll need it to make changes. It's in your email too.</p>
+        <div class="confCode">${esc(conf)}</div>
+        <p class="muted">${r.count} picks · ${money(r.wagered)} wagered. You can edit until ${esc(et(R.round.deadline))}.</p>
+        <div class="btnRow"><a class="btn primary" href="board.html?r=${R.round.key}">Done</a><button class="btn" data-close>Keep editing</button></div>`;
+      gate(`<div class="note ok">Submitted ✓ — code <b>${esc(conf)}</b>. Changes below will replace these picks.</div>`);
+    } catch (err) { Pool.toast(err.message, 1); e.target.disabled = false; e.target.textContent = 'Submit picks'; }
+  };
+};
+
+init();
+</script>
+</body>
+</html>

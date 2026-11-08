@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Picks &amp; Standings · Playoff Pick'em</title>
+<link rel="stylesheet" href="pool.css"/>
+</head>
+<body>
+<main class="wrap">
+  <div class="pillTabs" id="tabs"></div>
+  <section class="card hero" id="head"><div class="skeleton" style="margin:0"></div></section>
+  <div id="body"></div>
+</main>
+
+<script src="demo-data.js"></script>
+<script src="pool.js"></script>
+<script>
+Pool.nav('board');
+const { money, odds, esc, et } = Pool;
+const MK = { ML: 'Moneyline', SPREAD: 'Spread', TOTAL: 'Total' };
+const SIDES = { ML: ['AWAY', 'HOME'], SPREAD: ['AWAY', 'HOME'], TOTAL: ['OVER', 'UNDER'] };
+const $ = id => document.getElementById(id);
+let S, R, hl = Pool.remember('name') || '', refresh;
+
+async function init() {
+  try { S = await Pool.get('state'); }
+  catch (e) { $('head').innerHTML = `<div class="note err">${esc(e.message)}</div>`; return; }
+  const key = (Pool.param('r') || '').toUpperCase() || S.current;
+  $('tabs').innerHTML = S.rounds.map(r => `<a href="?r=${r.key}" data-k="${r.key}" class="${r.status === 'upcoming' ? 'off' : ''}">${esc(r.name)}</a>`).join('');
+  $('tabs').onclick = e => { const a = e.target.closest('a'); if (!a) return; e.preventDefault(); show(a.dataset.k); };
+  show(key);
+}
+
+async function show(key, quiet) {
+  try { history.replaceState(null, '', '?r=' + key); } catch (e) {}
+  document.querySelectorAll('#tabs a').forEach(a => a.classList.toggle('on', a.dataset.k === key));
+  if (!quiet) { $('body').innerHTML = '<div class="skeleton"></div><div class="skeleton"></div>'; }
+  try { R = await Pool.get('round', { round: key }); }
+  catch (e) { $('body').innerHTML = `<div class="note err">${esc(e.message)}</div>`; return; }
+  render();
+  clearInterval(refresh);
+  if (R.round.status === 'locked') refresh = setInterval(() => show(key, true), 60000);
+}
+
+function render() {
+  const r = R.round;
+  const n = R.players.filter(p => p.submitted).length;
+  let sub = '', right = '';
+  if (r.status === 'open') { sub = `Picks stay hidden until the lock: <b>${esc(et(r.deadline))}</b>.`; right = `<div class="countdown" data-countdown="${r.deadline}"></div>`; }
+  else if (r.status === 'locked') sub = 'Picks revealed. Scores refresh automatically — this page updates every minute.';
+  else if (r.status === 'final') sub = 'All games final. Bankrolls carry into the next round.';
+  else sub = 'This round hasn\'t opened yet.';
+  $('head').innerHTML = `<div class="heroRow"><div><div class="kicker">Picks &amp; standings</div><h1>${esc(r.name)}</h1>
+    <div style="margin-bottom:8px">${Pool.badge(r.status)}</div><p class="muted" style="margin:0">${sub}</p></div><div>${right}
+    ${r.status === 'open' ? `<div class="btnRow" style="margin-top:10px;justify-content:flex-end"><a class="btn primary" href="picks.html?r=${r.key}">Make picks →</a></div>` : ''}</div></div>`;
+  Pool.startCountdowns(() => show(r.key));
+
+  if (r.status === 'upcoming') { $('body').innerHTML = ''; return; }
+  if (!R.revealed) {
+    const alive = R.players.filter(p => p.alive);
+    $('body').innerHTML = `<section class="card" style="margin-top:16px"><div class="cardHead"><h2>Who's in</h2>
+      <span class="dim">${n} of ${alive.length}</span></div><div class="names">
+      ${alive.map(p => `<span class="chip ${p.submitted ? 'in' : ''}">${p.submitted ? '✓' : '…'} ${esc(p.name)}</span>`).join('')}</div></section>
+      <div class="section-title"><h2>This round's lines</h2></div>
+      ${R.games.map(g => gameCard(g)).join('')}`;
+    return;
+  }
+
+  const t = R.standings || [];
+  $('body').innerHTML = `
+    <section class="card" style="margin-top:16px">
+      <div class="cardHead"><h2>${esc(r.name)} standings</h2>
+        <select class="input" id="hl" style="width:auto;padding:8px 36px 8px 12px;font-size:.9rem"><option value="">Highlight a player…</option>
+        ${t.map(x => `<option ${x.name === hl ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div>
+      <div class="tblWrap"><table class="tbl"><thead><tr><th>#</th><th>Player</th><th class="r hideSm">Start</th><th class="r hideSm">Bet</th>
+        <th class="r hideSm">W-L-P</th>${r.status === 'locked' ? '<th class="r">Riding</th>' : ''}<th class="r">Now</th><th class="r">Round</th></tr></thead><tbody>
+      ${t.map(x => `<tr class="${x.name === hl ? 'me' : ''} ${x.worth < R.minWager ? 'out' : ''}">
+        <td class="rank ${x.rank <= 3 ? 'top' : ''}">${x.rank}</td><td>${esc(x.name)}</td>
+        <td class="r num hideSm dim">${money(x.start)}</td><td class="r num hideSm">${money(x.staked)}</td>
+        <td class="r num hideSm dim">${x.w}-${x.l}-${x.p}</td>
+        ${r.status === 'locked' ? `<td class="r num">${x.pending ? `${money(x.pending)}<div class="dim" style="font-size:.72rem">to win ${money(x.potential)}</div>` : '<span class="dim">—</span>'}</td>` : ''}
+        <td class="r num"><b>${money(x.end)}</b></td>
+        <td class="r num ${x.delta > 0 ? 'up' : x.delta < 0 ? 'down' : 'dim'}">${r.status === 'final' || !x.pending ? money(x.delta, { sign: 1 }) : '…'}</td></tr>`).join('')}
+      </tbody></table></div>
+    </section>
+    <div class="section-title"><h2>Every pick</h2><span class="dim">sorted by wager</span></div>
+    ${R.games.map(g => gameCard(g, true)).join('')}`;
+  $('hl').onchange = e => { hl = e.target.value; if (hl) Pool.remember('name', hl); render(); };
+}
+
+function gameCard(g, withBets) {
+  const sc = g.awayScore !== null && g.awayScore !== undefined;
+  const scoreHtml = sc ? `<div class="score"><span class="${g.final && g.awayScore > g.homeScore ? 'w' : ''}">${g.awayScore}</span>
+      <span class="dim">–</span> <span class="${g.final && g.homeScore > g.awayScore ? 'w' : ''}">${g.homeScore}</span>
+      <span class="badge ${g.final ? 'final' : 'locked'}" style="margin-left:8px">${g.final ? 'Final' : 'Live'}</span></div>`
+    : `<div class="gMeta">${esc(et(g.kickoff))}${g.channel ? ' · ' + esc(g.channel) : ''}</div>`;
+  return `<article class="game"><div class="gHead"><div class="matchup">${esc(g.away)}<span class="at">@</span>${esc(g.home)}</div>${scoreHtml}</div>
+    ${Object.keys(MK).map(m => {
+      const mk = g.markets[m], win = mk.winner;
+      const cols = SIDES[m].map(sd => {
+        const list = withBets ? (g.bets[m][sd] || []) : null;
+        const cls = win === sd ? 'won' : win && win !== 'PUSH' ? 'lost' : '';
+        const total = list ? list.reduce((a, b) => a + b.wager, 0) : 0;
+        return `<div class="bCol ${cls}"><div class="bColHead"><span>${esc(mk[sd].label)}</span><span class="o">${odds(mk[sd].odds)}</span></div>
+          ${list ? (list.length ? `<div class="bList">${list.map(b => `<div class="bet ${b.result} ${b.name === hl ? 'hl' : ''}">
+              <span class="who">${esc(b.name)}</span><span class="amt">${money(b.wager)}${b.result === 'WIN' ? ' → ' + money(b.toWin) : b.result === 'PUSH' ? ' push' : ''}</span></div>`).join('')}</div>
+              <div class="bSum">${list.length} bet${list.length > 1 ? 's' : ''} · ${money(total)}</div>` : '<div class="none">No bets</div>') : ''}
+        </div>`;
+      }).join('');
+      return `<div class="bMkt"><div class="bMktHead"><span class="mLabel">${MK[m]}</span>${win === 'PUSH' ? '<span class="badge final">Push</span>' : ''}</div>
+        <div class="bCols">${cols}</div></div>`;
+    }).join('')}</article>`;
+}
+
+init();
+</script>
+</body>
+</html>
