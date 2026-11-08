@@ -19,6 +19,7 @@
       <section class="card"><h3 style="margin-bottom:8px">Already registered</h3><div class="names" id="roster"><span class="dim">Loading…</span></div></section>
     </aside>
   </div>
+  <section class="card hidden" id="paySec" style="margin-top:16px"><h2 style="margin-bottom:12px">How to pay</h2><div id="payBody"></div></section>
 </main>
 
 <script src="pool.js"></script>
@@ -42,8 +43,10 @@ const $ = id => document.getElementById(id);
       <li>Bet moneylines, spreads &amp; totals each round</li>
       <li>Most money after the Super Bowl wins</li>
     </ul>
-    ${s.pool.entryFee ? `<div class="note" style="margin-top:12px"><b style="color:var(--text)">Entry: ${money(s.pool.entryFee)}</b>${s.pool.paymentInfo ? `<br>${esc(s.pool.paymentInfo)}` : ''}</div>` : ''}
+    ${s.pool.entryFee ? `<div class="note" style="margin-top:12px"><b style="color:var(--text)">Entry: ${money(s.pool.entryFee)}</b> — payment options below</div>` : ''}
     ${s.registration.deadline ? `<p class="dim" style="font-size:.85rem;margin:10px 0 0">Registration closes ${esc(et(s.registration.deadline))}</p>` : ''}`;
+
+  if (s.pool.entryFee) { $('paySec').classList.remove('hidden'); $('payBody').innerHTML = Pool.payHTML(s.pool.entryFee); }
 
   if (!s.registration.open) {
     $('formBody').innerHTML = `<div class="note warn">Registration is closed for this year. Catch you next January! 🏈</div>
@@ -65,7 +68,7 @@ const $ = id => document.getElementById(id);
       Pool.remember('name', r.name);
       $('formBody').innerHTML = `<div class="note ok" style="font-size:1rem">You're in, <b>${esc(r.name)}</b>! 🎉</div>
         <p class="muted">${esc(r.message || '')}</p>
-        ${s.pool.entryFee ? `<p>Don't forget the <b>${money(s.pool.entryFee)}</b> entry${s.pool.paymentInfo ? ': ' + esc(s.pool.paymentInfo) : ''}.</p>` : ''}
+        ${s.pool.entryFee ? `<p>Don't forget the <b>${money(s.pool.entryFee)}</b> entry — payment options are just below.</p>` : ''}
         <div class="btnRow"><a class="btn primary" href="index.html">Pool home</a></div>`;
     } catch (err) { Pool.toast(err.message, 1); btn.disabled = false; btn.textContent = 'Register'; }
   };

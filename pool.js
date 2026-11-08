@@ -4,6 +4,14 @@
  */
 const API_URL = 'https://script.google.com/macros/s/AKfycbwSXDps3vPV4hfiFp7EOd9F6BtGmF1-Bz-VTlmNrwYto__nWHJkreXbiRDDYy7dS2gUsg/exec';
 
+/* Payment methods shown on the register page (fee amount comes from Settings ▸ EntryFee). */
+const PAYMENT_METHODS = [
+  { name: 'Apple Pay', handle: '(708) 542-5972' },
+  { name: 'Venmo',     handle: '@Foxy-Lady85', note: 'If asked, last 4 of phone: 5972' },
+  { name: 'PayPal',    handle: '@FOXYLADY85' },
+  { name: 'Zelle',     handle: '(708) 542-5972' }
+];
+
 /* ------------------------------------------------------------------ */
 const Pool = (() => {
   const DEMO = !API_URL;
@@ -115,9 +123,23 @@ const Pool = (() => {
     document.body.append(bg);
     return bg;
   }
+  /** Fee banner + clickable payment cards (click copies the handle). */
+  function payHTML(fee) {
+    return `<div class="payFee"><div class="amt">${money(fee)}</div><div>The entry fee is <b>${money(fee)}</b>. Send it using any of the methods below — pick whichever is easiest for you.</div></div>
+      <div class="payGrid">${PAYMENT_METHODS.map(m => `<button type="button" class="payCard" data-copy="${esc(m.handle)}">
+        <i class="radio"></i><div><div class="pm">${esc(m.name)}</div><div class="ph">${esc(m.handle)}</div>
+        ${m.note ? `<div class="pn">${esc(m.note)}</div>` : ''}</div></button>`).join('')}</div>
+      <p class="dim" style="font-size:.8rem;margin:10px 0 0">Tap a method to copy it.</p>`;
+  }
+  document.addEventListener('click', async e => {
+    const c = e.target.closest('.payCard'); if (!c) return;
+    document.querySelectorAll('.payCard').forEach(x => x.classList.toggle('on', x === c));
+    try { await navigator.clipboard.writeText(c.dataset.copy); toast('Copied ' + c.dataset.copy); } catch (err) {}
+  });
+
   const param = k => new URLSearchParams(location.search).get(k);
   const remember = (k, v) => { try { v === undefined ? (v = localStorage.getItem('pool_' + k)) : localStorage.setItem('pool_' + k, v); } catch (e) {} return v; };
 
   return { DEMO, ROUND_ORDER, get, post, money, odds, payout, et, esc, badge, statusLabel, countdownHTML, startCountdowns,
-    nav, toast, modal, param, remember };
+    nav, toast, modal, param, remember, payHTML };
 })();

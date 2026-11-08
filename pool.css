@@ -246,3 +246,20 @@ details.rules summary{cursor:pointer;font-weight:700;color:var(--text);list-styl
 details.rules summary::after{content:" ▾";color:var(--dim)}
 details.rules ul{margin:10px 0 0;padding-left:18px;color:var(--muted)}
 details.rules li{margin:5px 0}
+
+/* ===== Payment ===== */
+.payFee{display:flex;align-items:center;gap:22px;padding:20px 24px;border:1px solid var(--orange);border-radius:var(--r);
+  background:linear-gradient(160deg,var(--navy-2),#0a1222);margin-bottom:14px;color:var(--text)}
+.payFee .amt{font:700 3rem var(--head);color:var(--orange-2);line-height:1;flex:none}
+.payGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media(max-width:600px){.payGrid{grid-template-columns:1fr}.payFee{flex-direction:column;align-items:flex-start;gap:8px}}
+.payCard{display:flex;gap:14px;align-items:flex-start;text-align:left;padding:18px 20px;border-radius:var(--r);border:1px solid var(--line);
+  background:linear-gradient(160deg,var(--navy-2),#0a1222);color:var(--text);cursor:pointer;font:inherit;transition:border-color .15s}
+.payCard:hover{border-color:var(--line-2)}
+.payCard.on{border-color:var(--orange)}
+.payCard .radio{width:24px;height:24px;border-radius:50%;border:2px solid var(--muted);flex:none;margin-top:1px;position:relative}
+.payCard.on .radio{border-color:var(--orange)}
+.payCard.on .radio::after{content:"";position:absolute;inset:4px;border-radius:50%;background:var(--orange)}
+.payCard .pm{font:600 1.15rem var(--head);letter-spacing:.06em;text-transform:uppercase}
+.payCard .ph{font:600 1.15rem var(--head);color:var(--orange-2);margin-top:6px;letter-spacing:.02em}
+.payCard .pn{font:600 .75rem var(--head);letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:8px}
